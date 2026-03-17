@@ -40,10 +40,20 @@ jobs:
             -d build/backport \
             src/j9compat/CollectionBackport.java \
             src/j9compat/StreamBackport.java \
+            src/j9compat/IntStreamBackport.java \
+            src/j9compat/LongStreamBackport.java \
+            src/j9compat/DoubleStreamBackport.java \
             src/j9compat/OptionalBackport.java \
+            src/j9compat/OptionalIntBackport.java \
+            src/j9compat/OptionalLongBackport.java \
+            src/j9compat/OptionalDoubleBackport.java \
             src/j9compat/IOBackport.java \
             src/j9compat/ObjectsBackport.java \
-            src/j9compat/CompletableFutureBackport.java
+            src/j9compat/CompletableFutureBackport.java \
+            src/j9compat/CollectorsBackport.java \
+            src/j9compat/ProcessHandle.java \
+            src/j9compat/StackWalker.java \
+            src/j9compat/Flow.java
 
       # Compile the desugarer tool itself (also Java 8 target)
       - name: Compile desugarer tool
@@ -54,7 +64,8 @@ jobs:
             -d build/desugarer \
             src/desugarer/Java9ToJava8Desugarer.java \
             src/desugarer/ClassDesugarer.java \
-            src/desugarer/MethodDesugarer.java
+            src/desugarer/MethodDesugarer.java \
+            src/desugarer/BackportRemapper.java
 
       # Package everything into a single fat JAR
       - name: Package desugarer fat JAR
@@ -110,10 +121,20 @@ jobs:
             -d build/backport \
             src/j9compat/CollectionBackport.java \
             src/j9compat/StreamBackport.java \
+            src/j9compat/IntStreamBackport.java \
+            src/j9compat/LongStreamBackport.java \
+            src/j9compat/DoubleStreamBackport.java \
             src/j9compat/OptionalBackport.java \
+            src/j9compat/OptionalIntBackport.java \
+            src/j9compat/OptionalLongBackport.java \
+            src/j9compat/OptionalDoubleBackport.java \
             src/j9compat/IOBackport.java \
             src/j9compat/ObjectsBackport.java \
-            src/j9compat/CompletableFutureBackport.java
+            src/j9compat/CompletableFutureBackport.java \
+            src/j9compat/CollectorsBackport.java \
+            src/j9compat/ProcessHandle.java \
+            src/j9compat/StackWalker.java \
+            src/j9compat/Flow.java
 
       - name: Compile backport unit tests
         run: |
@@ -125,9 +146,13 @@ jobs:
             src/test/ObjectsBackportTest.java \
             src/test/CollectionBackportTest.java \
             src/test/StreamBackportTest.java \
+            src/test/PrimitiveStreamBackportTest.java \
             src/test/OptionalBackportTest.java \
+            src/test/OptionalPrimitiveBackportTest.java \
             src/test/IOBackportTest.java \
-            src/test/CompletableFutureBackportTest.java
+            src/test/CompletableFutureBackportTest.java \
+            src/test/ProcessHandleBackportTest.java \
+            src/test/StackWalkerBackportTest.java
 
       - name: Run backport unit tests
         run: |
@@ -163,10 +188,20 @@ jobs:
             -d build/backport \
             src/j9compat/CollectionBackport.java \
             src/j9compat/StreamBackport.java \
+            src/j9compat/IntStreamBackport.java \
+            src/j9compat/LongStreamBackport.java \
+            src/j9compat/DoubleStreamBackport.java \
             src/j9compat/OptionalBackport.java \
+            src/j9compat/OptionalIntBackport.java \
+            src/j9compat/OptionalLongBackport.java \
+            src/j9compat/OptionalDoubleBackport.java \
             src/j9compat/IOBackport.java \
             src/j9compat/ObjectsBackport.java \
-            src/j9compat/CompletableFutureBackport.java
+            src/j9compat/CompletableFutureBackport.java \
+            src/j9compat/CollectorsBackport.java \
+            src/j9compat/ProcessHandle.java \
+            src/j9compat/StackWalker.java \
+            src/j9compat/Flow.java
 
       # Create a minimal Java 9-style test JAR
       - name: Create sample Java 9 test JAR

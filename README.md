@@ -16,11 +16,14 @@ fully **Java 8-compatible** JAR, including a bundled runtime backport library
 | **String concatenation** | Rewrites `invokedynamic` StringConcatFactory concatenation to `StringBuilder` bytecode. |
 | **Collection factory methods** | Redirects `List.of()`, `Set.of()`, `Map.of()`, `Map.ofEntries()`, `Map.entry()`, and all `copyOf()` variants to `j9compat.CollectionBackport`. |
 | **Stream API additions** | Redirects `takeWhile()`, `dropWhile()`, `ofNullable()`, and the three-argument `iterate()` to `j9compat.StreamBackport`. |
+| **Primitive Stream additions** | Redirects `IntStream/LongStream/DoubleStream.takeWhile()`, `dropWhile()`, and the three-argument `iterate()` to `j9compat.*StreamBackport`. |
 | **Collectors additions** | Redirects `Collectors.filtering()` and `Collectors.flatMapping()` to `j9compat.CollectorsBackport`. |
 | **Optional API additions** | Redirects `ifPresentOrElse()`, `or()`, and `stream()` to `j9compat.OptionalBackport`. |
+| **Optional primitive additions** | Redirects `OptionalInt/Long/Double.ifPresentOrElse()` and `.stream()` to `j9compat.Optional*Backport`. |
 | **InputStream additions** | Redirects `transferTo()`, `readAllBytes()`, and `readNBytes()` to `j9compat.IOBackport`. |
 | **Objects additions** | Redirects `requireNonNullElse()`, `requireNonNullElseGet()`, `checkIndex()`, `checkFromToIndex()`, and `checkFromIndexSize()` to `j9compat.ObjectsBackport`. |
 | **CompletableFuture additions** | Redirects `orTimeout()`, `completeOnTimeout()`, `failedFuture()`, `completedStage()`, `failedStage()`, `minimalCompletionStage()`, `newIncompleteFuture()`, and `copy()` to `j9compat.CompletableFutureBackport`. |
+| **Process/Stack/Flow types** | Remaps `ProcessHandle`, `StackWalker`, and `Flow` to Java 8-compatible `j9compat` implementations. |
 
 ---
 
@@ -41,11 +44,20 @@ fully **Java 8-compatible** JAR, including a bundled runtime backport library
 │   └── j9compat/                       Runtime backport library (Java 8)
 │       ├── CollectionBackport.java     List/Set/Map factory methods
 │       ├── StreamBackport.java         Stream additions
+│       ├── IntStreamBackport.java      IntStream additions
+│       ├── LongStreamBackport.java     LongStream additions
+│       ├── DoubleStreamBackport.java   DoubleStream additions
 │       ├── OptionalBackport.java       Optional additions
+│       ├── OptionalIntBackport.java    OptionalInt additions
+│       ├── OptionalLongBackport.java   OptionalLong additions
+│       ├── OptionalDoubleBackport.java OptionalDouble additions
 │       ├── IOBackport.java             InputStream additions
 │       ├── ObjectsBackport.java        Objects additions
 │       ├── CollectorsBackport.java     Collectors additions
-│       └── CompletableFutureBackport.java  CompletableFuture additions
+│       ├── CompletableFutureBackport.java  CompletableFuture additions
+│       ├── ProcessHandle.java          ProcessHandle backport
+│       ├── StackWalker.java            StackWalker backport
+│       └── Flow.java                   Flow (Reactive Streams) interfaces
 │
 └── .github/workflows/
     └── desugar-java9-to-java8.yml      CI pipeline
@@ -63,10 +75,20 @@ javac -source 8 -target 8 \
   -d build/backport \
   src/j9compat/CollectionBackport.java \
   src/j9compat/StreamBackport.java \
+  src/j9compat/IntStreamBackport.java \
+  src/j9compat/LongStreamBackport.java \
+  src/j9compat/DoubleStreamBackport.java \
   src/j9compat/OptionalBackport.java \
+  src/j9compat/OptionalIntBackport.java \
+  src/j9compat/OptionalLongBackport.java \
+  src/j9compat/OptionalDoubleBackport.java \
   src/j9compat/IOBackport.java \
   src/j9compat/ObjectsBackport.java \
-  src/j9compat/CompletableFutureBackport.java
+  src/j9compat/CompletableFutureBackport.java \
+  src/j9compat/CollectorsBackport.java \
+  src/j9compat/ProcessHandle.java \
+  src/j9compat/StackWalker.java \
+  src/j9compat/Flow.java
 
 # 2. Compile the desugarer tool
 mkdir -p build/desugarer
@@ -75,7 +97,8 @@ javac -source 8 -target 8 \
   -d build/desugarer \
   src/desugarer/Java9ToJava8Desugarer.java \
   src/desugarer/ClassDesugarer.java \
-  src/desugarer/MethodDesugarer.java
+  src/desugarer/MethodDesugarer.java \
+  src/desugarer/BackportRemapper.java
 
 # 3. Build a fat JAR (ASM + desugarer classes in one JAR)
 mkdir -p build/fatjar
@@ -142,6 +165,13 @@ Stream.ofNullable(t)           --> StreamBackport.ofNullable(t)
 Stream.iterate(s, hasNext, f)  --> StreamBackport.iterate(s, hasNext, f)
 ```
 
+### Primitive Stream API
+```java
+intStream.takeWhile(p)         --> IntStreamBackport.takeWhile(intStream, p)
+longStream.dropWhile(p)        --> LongStreamBackport.dropWhile(longStream, p)
+DoubleStream.iterate(s, h, f)  --> DoubleStreamBackport.iterate(s, h, f)
+```
+
 ### Collectors API
 ```java
 Collectors.filtering(p, c)     --> CollectorsBackport.filtering(p, c)
@@ -153,6 +183,13 @@ Collectors.flatMapping(f, c)   --> CollectorsBackport.flatMapping(f, c)
 opt.ifPresentOrElse(a, e)      --> OptionalBackport.ifPresentOrElse(opt, a, e)
 opt.or(supplier)               --> OptionalBackport.or(opt, supplier)
 opt.stream()                   --> OptionalBackport.stream(opt)
+```
+
+### Optional primitive API
+```java
+optInt.ifPresentOrElse(a, e)   --> OptionalIntBackport.ifPresentOrElse(optInt, a, e)
+optLong.stream()               --> OptionalLongBackport.stream(optLong)
+optDouble.stream()             --> OptionalDoubleBackport.stream(optDouble)
 ```
 
 ### InputStream API
@@ -181,6 +218,13 @@ CompletableFuture.failedStage(ex)    --> CompletableFutureBackport.failedStage(e
 cf.minimalCompletionStage()          --> CompletableFutureBackport.minimalCompletionStage(cf)
 cf.newIncompleteFuture()             --> CompletableFutureBackport.newIncompleteFuture(cf)
 cf.copy()                            --> CompletableFutureBackport.copy(cf)
+```
+
+### Process/Stack/Flow types
+```java
+ProcessHandle.current()        --> j9compat.ProcessHandle.current()
+StackWalker.getInstance()      --> j9compat.StackWalker.getInstance()
+Flow.Publisher<T>              --> j9compat.Flow.Publisher<T>
 ```
 
 ---
