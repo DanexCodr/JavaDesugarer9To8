@@ -1,6 +1,7 @@
 package j9compat;
 
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
@@ -43,14 +44,10 @@ public final class StreamBackport {
         Objects.requireNonNull(stream,    "stream");
         Objects.requireNonNull(predicate, "predicate");
 
-        Iterator<T> iter = Spliterators.iterator(stream.spliterator());
-        List<T> result = new ArrayList<>();
-        while (iter.hasNext()) {
-            T t = iter.next();
-            if (!predicate.test(t)) break;
-            result.add(t);
-        }
-        return result.stream();
+        Spliterator<T> source = stream.spliterator();
+        Spliterator<T> spliterator = new TakeWhileSpliterator<>(source, predicate);
+        return StreamSupport.stream(spliterator, stream.isParallel())
+                .onClose(stream::close);
     }
 
     // ── Stream.dropWhile ─────────────────────────────────────────────────────
@@ -65,18 +62,10 @@ public final class StreamBackport {
         Objects.requireNonNull(stream,    "stream");
         Objects.requireNonNull(predicate, "predicate");
 
-        Iterator<T> iter = Spliterators.iterator(stream.spliterator());
-        List<T> result = new ArrayList<>();
-        boolean dropping = true;
-        while (iter.hasNext()) {
-            T t = iter.next();
-            if (dropping && predicate.test(t)) {
-                continue;
-            }
-            dropping = false;
-            result.add(t);
-        }
-        return result.stream();
+        Spliterator<T> source = stream.spliterator();
+        Spliterator<T> spliterator = new DropWhileSpliterator<>(source, predicate);
+        return StreamSupport.stream(spliterator, stream.isParallel())
+                .onClose(stream::close);
     }
 
     // ── Stream.ofNullable ────────────────────────────────────────────────────
@@ -139,5 +128,84 @@ public final class StreamBackport {
         };
 
         return StreamSupport.stream(spliterator, false);
+    }
+
+    // ── Spliterators ──────────────────────────────────────────────────────────
+
+    private static final class TakeWhileSpliterator<T> extends Spliterators.AbstractSpliterator<T> {
+        private final Spliterator<T> source;
+        private final Predicate<? super T> predicate;
+        private boolean taking = true;
+
+        TakeWhileSpliterator(Spliterator<T> source, Predicate<? super T> predicate) {
+            super(source.estimateSize(), trimmedCharacteristics(source));
+            this.source = source;
+            this.predicate = predicate;
+        }
+
+        @Override
+        public boolean tryAdvance(Consumer<? super T> action) {
+            if (!taking) {
+                return false;
+            }
+            final boolean[] emitted = {false};
+            boolean advanced = source.tryAdvance(value -> {
+                if (predicate.test(value)) {
+                    emitted[0] = true;
+                    action.accept(value);
+                } else {
+                    taking = false;
+                }
+            });
+            return advanced && emitted[0];
+        }
+
+        @Override
+        public Comparator<? super T> getComparator() {
+            return source.getComparator();
+        }
+    }
+
+    private static final class DropWhileSpliterator<T> extends Spliterators.AbstractSpliterator<T> {
+        private final Spliterator<T> source;
+        private final Predicate<? super T> predicate;
+        private boolean dropping = true;
+
+        DropWhileSpliterator(Spliterator<T> source, Predicate<? super T> predicate) {
+            super(source.estimateSize(), trimmedCharacteristics(source));
+            this.source = source;
+            this.predicate = predicate;
+        }
+
+        @Override
+        public boolean tryAdvance(Consumer<? super T> action) {
+            if (!dropping) {
+                return source.tryAdvance(action);
+            }
+            boolean[] emitted = {false};
+            while (dropping && !emitted[0]) {
+                boolean advanced = source.tryAdvance(value -> {
+                    if (dropping && predicate.test(value)) {
+                        return;
+                    }
+                    dropping = false;
+                    emitted[0] = true;
+                    action.accept(value);
+                });
+                if (!advanced) {
+                    return false;
+                }
+            }
+            return emitted[0];
+        }
+
+        @Override
+        public Comparator<? super T> getComparator() {
+            return source.getComparator();
+        }
+    }
+
+    private static int trimmedCharacteristics(Spliterator<?> source) {
+        return source.characteristics() & ~(Spliterator.SIZED | Spliterator.SUBSIZED);
     }
 }

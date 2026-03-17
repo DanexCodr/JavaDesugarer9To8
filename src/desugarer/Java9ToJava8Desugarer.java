@@ -13,8 +13,8 @@ import java.util.jar.*;
  * Java 8-compatible JAR (class version 52) by:
  *
  *  1. Downgrading the class-file version from 53 (Java 9) to 52 (Java 8).
- *  2. Removing module-info.class entries (the JPMS module system has no Java 8
- *     equivalent).
+ *  2. Downgrading module-info.class entries so they remain present as metadata
+ *     (the JPMS module system itself has no Java 8 equivalent).
  *  3. Making private interface methods package-private so that the Java 8
  *     verifier accepts them.
  *  4. Redirecting Java 9-only API calls to the j9compat backport library that
@@ -25,13 +25,15 @@ import java.util.jar.*;
  *    Map.ofEntries, Map.entry, copyOf variants)
  *  - java.util.stream.Stream additions            (takeWhile, dropWhile,
  *    ofNullable, three-argument iterate)
+ *  - java.util.stream.Collectors additions        (filtering, flatMapping)
  *  - java.util.Optional additions                 (ifPresentOrElse, or, stream)
  *  - java.io.InputStream additions               (transferTo, readAllBytes,
  *    readNBytes)
  *  - java.util.Objects additions                  (requireNonNullElse,
  *    requireNonNullElseGet, checkIndex)
  *  - java.util.concurrent.CompletableFuture additions  (orTimeout,
- *    completeOnTimeout, failedFuture, completedStage, failedStage, copy)
+ *    completeOnTimeout, failedFuture, completedStage, failedStage,
+ *    minimalCompletionStage, newIncompleteFuture, copy)
  *
  * Usage:
  *   java -cp desugar9to8.jar:asm-9.4.jar:asm-commons-9.4.jar:asm-tree-9.4.jar \
@@ -47,6 +49,7 @@ public class Java9ToJava8Desugarer {
         "j9compat/IOBackport.class",
         "j9compat/ObjectsBackport.class",
         "j9compat/CompletableFutureBackport.class",
+        "j9compat/CollectorsBackport.class",
     };
 
     // ────────────────────────────────────────────────────────────────────────
@@ -86,7 +89,7 @@ public class Java9ToJava8Desugarer {
         System.out.println("── Summary ──────────────────────────────");
         System.out.println("  Classes processed  : " + stats.classesProcessed);
         System.out.println("  Version downgraded : " + stats.versionDowngraded);
-        System.out.println("  Module-info skipped: " + stats.moduleInfoSkipped);
+        System.out.println("  Module-info kept   : " + stats.moduleInfoProcessed);
         System.out.println("  API calls remapped : " + stats.apiCallsRemapped);
         System.out.println("  Iface priv methods : " + stats.privateIfaceMethods);
         System.out.println("  Other entries kept : " + stats.otherEntries);
@@ -112,12 +115,9 @@ public class Java9ToJava8Desugarer {
                 JarEntry entry = entries.nextElement();
                 String name = entry.getName();
 
-                // Skip module-info at any nesting depth
                 if (name.equals("module-info.class")
                         || name.endsWith("/module-info.class")) {
-                    System.out.println("  [SKIP ]  " + name);
-                    stats.moduleInfoSkipped++;
-                    continue;
+                    stats.moduleInfoProcessed++;
                 }
 
                 try (InputStream is = jarFile.getInputStream(entry)) {
@@ -239,7 +239,7 @@ public class Java9ToJava8Desugarer {
     public static class Stats {
         public int classesProcessed;
         public int versionDowngraded;
-        public int moduleInfoSkipped;
+        public int moduleInfoProcessed;
         public int apiCallsRemapped;
         public int privateIfaceMethods;
         public int otherEntries;

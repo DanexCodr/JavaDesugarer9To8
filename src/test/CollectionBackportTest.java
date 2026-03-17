@@ -186,6 +186,12 @@ public final class CollectionBackportTest {
         assertThrows(NullPointerException.class,
                 () -> CollectionBackport.setCopyOf(null),
                 "setCopyOf(null): throws NPE");
+
+        // Duplicate element rejection
+        List<String> dupes = Arrays.asList("dup", "dup");
+        assertThrows(IllegalArgumentException.class,
+                () -> CollectionBackport.setCopyOf(dupes),
+                "setCopyOf with duplicates throws IAE");
     }
 
     // ── Map.of ───────────────────────────────────────────────────────────────

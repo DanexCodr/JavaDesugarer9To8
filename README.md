@@ -11,14 +11,16 @@ fully **Java 8-compatible** JAR, including a bundled runtime backport library
 | Transformation | Description |
 |----------------|-------------|
 | **Class-file version downgrade** | Changes class file major version from 53 (Java 9) to 52 (Java 8). |
-| **Module-info removal** | Strips `module-info.class` entries; the JPMS module system has no Java 8 equivalent. |
+| **Module-info retention** | Downgrades `module-info.class` so module metadata is preserved even though Java 8 ignores JPMS. |
 | **Private interface methods** | Java 9 allows `private` methods in interfaces. This tool makes them package-private so the Java 8 verifier accepts them. |
+| **String concatenation** | Rewrites `invokedynamic` StringConcatFactory concatenation to `StringBuilder` bytecode. |
 | **Collection factory methods** | Redirects `List.of()`, `Set.of()`, `Map.of()`, `Map.ofEntries()`, `Map.entry()`, and all `copyOf()` variants to `j9compat.CollectionBackport`. |
 | **Stream API additions** | Redirects `takeWhile()`, `dropWhile()`, `ofNullable()`, and the three-argument `iterate()` to `j9compat.StreamBackport`. |
+| **Collectors additions** | Redirects `Collectors.filtering()` and `Collectors.flatMapping()` to `j9compat.CollectorsBackport`. |
 | **Optional API additions** | Redirects `ifPresentOrElse()`, `or()`, and `stream()` to `j9compat.OptionalBackport`. |
 | **InputStream additions** | Redirects `transferTo()`, `readAllBytes()`, and `readNBytes()` to `j9compat.IOBackport`. |
 | **Objects additions** | Redirects `requireNonNullElse()`, `requireNonNullElseGet()`, `checkIndex()`, `checkFromToIndex()`, and `checkFromIndexSize()` to `j9compat.ObjectsBackport`. |
-| **CompletableFuture additions** | Redirects `orTimeout()`, `completeOnTimeout()`, `failedFuture()`, `completedStage()`, `failedStage()`, and `copy()` to `j9compat.CompletableFutureBackport`. |
+| **CompletableFuture additions** | Redirects `orTimeout()`, `completeOnTimeout()`, `failedFuture()`, `completedStage()`, `failedStage()`, `minimalCompletionStage()`, `newIncompleteFuture()`, and `copy()` to `j9compat.CompletableFutureBackport`. |
 
 ---
 
@@ -42,6 +44,7 @@ fully **Java 8-compatible** JAR, including a bundled runtime backport library
 │       ├── OptionalBackport.java       Optional additions
 │       ├── IOBackport.java             InputStream additions
 │       ├── ObjectsBackport.java        Objects additions
+│       ├── CollectorsBackport.java     Collectors additions
 │       └── CompletableFutureBackport.java  CompletableFuture additions
 │
 └── .github/workflows/
@@ -139,6 +142,12 @@ Stream.ofNullable(t)           --> StreamBackport.ofNullable(t)
 Stream.iterate(s, hasNext, f)  --> StreamBackport.iterate(s, hasNext, f)
 ```
 
+### Collectors API
+```java
+Collectors.filtering(p, c)     --> CollectorsBackport.filtering(p, c)
+Collectors.flatMapping(f, c)   --> CollectorsBackport.flatMapping(f, c)
+```
+
 ### Optional API
 ```java
 opt.ifPresentOrElse(a, e)      --> OptionalBackport.ifPresentOrElse(opt, a, e)
@@ -169,6 +178,8 @@ cf.completeOnTimeout(v, 1, SECONDS)  --> CompletableFutureBackport.completeOnTim
 CompletableFuture.failedFuture(ex)   --> CompletableFutureBackport.failedFuture(ex)
 CompletableFuture.completedStage(v)  --> CompletableFutureBackport.completedStage(v)
 CompletableFuture.failedStage(ex)    --> CompletableFutureBackport.failedStage(ex)
+cf.minimalCompletionStage()          --> CompletableFutureBackport.minimalCompletionStage(cf)
+cf.newIncompleteFuture()             --> CompletableFutureBackport.newIncompleteFuture(cf)
 cf.copy()                            --> CompletableFutureBackport.copy(cf)
 ```
 

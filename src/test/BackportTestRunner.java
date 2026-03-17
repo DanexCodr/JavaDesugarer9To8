@@ -73,6 +73,7 @@ public final class BackportTestRunner {
         ObjectsBackportTest.run();
         CollectionBackportTest.run();
         StreamBackportTest.run();
+        CollectorsBackportTest.run();
         OptionalBackportTest.run();
         IOBackportTest.run();
         CompletableFutureBackportTest.run();

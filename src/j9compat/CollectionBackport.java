@@ -1,6 +1,7 @@
 package j9compat;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Java 8-compatible backport of the immutable-collection factory methods
@@ -152,24 +153,32 @@ public final class CollectionBackport {
 
     @SafeVarargs
     public static <E> Set<E> setOf(E... elements) {
-        Set<E> set = new LinkedHashSet<>(elements.length * 2);
+        List<E> values = new ArrayList<>(elements.length);
+        Set<E> seen = new HashSet<>(elements.length * 2);
         for (E e : elements) {
             requireNonNull(e, "element");
-            if (!set.add(e)) {
+            if (!seen.add(e)) {
                 throw new IllegalArgumentException("Duplicate element: " + e);
             }
+            values.add(e);
         }
-        return Collections.unmodifiableSet(set);
+        shuffle(values);
+        return Collections.unmodifiableSet(new LinkedHashSet<>(values));
     }
 
     public static <E> Set<E> setCopyOf(Collection<? extends E> coll) {
         Objects.requireNonNull(coll, "collection");
-        Set<E> set = new LinkedHashSet<>(coll.size() * 2);
+        List<E> values = new ArrayList<>(coll.size());
+        Set<E> seen = new HashSet<>(coll.size() * 2);
         for (E e : coll) {
             requireNonNull(e, "element");
-            set.add(e);
+            if (!seen.add(e)) {
+                throw new IllegalArgumentException("Duplicate element: " + e);
+            }
+            values.add(e);
         }
-        return Collections.unmodifiableSet(set);
+        shuffle(values);
+        return Collections.unmodifiableSet(new LinkedHashSet<>(values));
     }
 
     // ── Map.of ──────────────────────────────────────────────────────────────
@@ -254,13 +263,20 @@ public final class CollectionBackport {
     public static <K, V> Map<K, V> mapOfEntries(
             Map.Entry<? extends K, ? extends V>... entries) {
         Objects.requireNonNull(entries, "entries");
-        Map<K, V> map = new LinkedHashMap<>(entries.length * 2);
+        List<Map.Entry<? extends K, ? extends V>> shuffled = new ArrayList<>(entries.length);
         for (Map.Entry<? extends K, ? extends V> e : entries) {
             Objects.requireNonNull(e, "entry");
             K k = e.getKey();
             V v = e.getValue();
             requireNonNull(k, "key");
             requireNonNull(v, "value");
+            shuffled.add(e);
+        }
+        shuffle(shuffled);
+        Map<K, V> map = new LinkedHashMap<>(entries.length * 2);
+        for (Map.Entry<? extends K, ? extends V> e : shuffled) {
+            K k = e.getKey();
+            V v = e.getValue();
             if (map.containsKey(k)) {
                 throw new IllegalArgumentException("Duplicate key: " + k);
             }
@@ -271,10 +287,15 @@ public final class CollectionBackport {
 
     public static <K, V> Map<K, V> mapCopyOf(Map<? extends K, ? extends V> m) {
         Objects.requireNonNull(m, "map");
+        List<Map.Entry<? extends K, ? extends V>> entries =
+                new ArrayList<>(m.entrySet());
+        shuffle(entries);
         Map<K, V> copy = new LinkedHashMap<>(m.size() * 2);
         for (Map.Entry<? extends K, ? extends V> e : m.entrySet()) {
             requireNonNull(e.getKey(),   "key");
             requireNonNull(e.getValue(), "value");
+        }
+        for (Map.Entry<? extends K, ? extends V> e : entries) {
             copy.put(e.getKey(), e.getValue());
         }
         return Collections.unmodifiableMap(copy);
@@ -292,28 +313,37 @@ public final class CollectionBackport {
 
     @SafeVarargs
     private static <E> Set<E> unmodifiableSet(E... elements) {
-        Set<E> set = new LinkedHashSet<>(elements.length * 2);
+        List<E> values = new ArrayList<>(elements.length);
+        Set<E> seen = new HashSet<>(elements.length * 2);
         for (E e : elements) {
             requireNonNull(e, "element");
-            if (!set.add(e)) {
+            if (!seen.add(e)) {
                 throw new IllegalArgumentException("Duplicate element: " + e);
             }
+            values.add(e);
         }
-        return Collections.unmodifiableSet(set);
+        shuffle(values);
+        return Collections.unmodifiableSet(new LinkedHashSet<>(values));
     }
 
     /** Builds a map from alternating key/value pairs. */
     private static <K, V> Map<K, V> buildMap(Object... kvPairs) {
-        Map<K, V> map = new LinkedHashMap<>(kvPairs.length);
+        List<Map.Entry<K, V>> entries = new ArrayList<>(kvPairs.length / 2);
         for (int i = 0; i < kvPairs.length; i += 2) {
             K k = (K) kvPairs[i];
             V v = (V) kvPairs[i + 1];
             requireNonNull(k, "key");
             requireNonNull(v, "value");
+            entries.add(new AbstractMap.SimpleImmutableEntry<>(k, v));
+        }
+        shuffle(entries);
+        Map<K, V> map = new LinkedHashMap<>(kvPairs.length);
+        for (Map.Entry<K, V> entry : entries) {
+            K k = entry.getKey();
             if (map.containsKey(k)) {
                 throw new IllegalArgumentException("Duplicate key: " + k);
             }
-            map.put(k, v);
+            map.put(k, entry.getValue());
         }
         return Collections.unmodifiableMap(map);
     }
@@ -321,6 +351,12 @@ public final class CollectionBackport {
     private static void requireNonNull(Object obj, String label) {
         if (obj == null) {
             throw new NullPointerException(label + " must not be null");
+        }
+    }
+
+    private static void shuffle(List<?> values) {
+        if (values.size() > 1) {
+            Collections.shuffle(values, ThreadLocalRandom.current());
         }
     }
 }
