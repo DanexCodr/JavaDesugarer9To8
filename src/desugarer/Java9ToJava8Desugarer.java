@@ -221,6 +221,8 @@ public class Java9ToJava8Desugarer {
             }
             if (previousOutputSnapshot != null && previousOutputSnapshot.exists()) {
                 if (!previousOutputSnapshot.delete()) {
+                    System.err.println("Warning: unable to delete output snapshot: "
+                            + previousOutputSnapshot.getAbsolutePath());
                     previousOutputSnapshot.deleteOnExit();
                 }
             }
@@ -455,9 +457,16 @@ public class Java9ToJava8Desugarer {
         String version = props.getProperty(CACHE_VERSION_KEY);
         String cachedInput = props.getProperty(CACHE_INPUT_KEY);
         String cachedOutput = props.getProperty(CACHE_OUTPUT_KEY);
-        if (!CACHE_VERSION.equals(version)
-                || !input.getAbsolutePath().equals(cachedInput)
-                || !output.getAbsolutePath().equals(cachedOutput)) {
+        if (!CACHE_VERSION.equals(version)) {
+            System.err.println("Warning: cache version mismatch, ignoring cache.");
+            return Collections.emptyMap();
+        }
+        if (!input.getAbsolutePath().equals(cachedInput)) {
+            System.err.println("Warning: cache input mismatch, ignoring cache.");
+            return Collections.emptyMap();
+        }
+        if (!output.getAbsolutePath().equals(cachedOutput)) {
+            System.err.println("Warning: cache output mismatch, ignoring cache.");
             return Collections.emptyMap();
         }
         Map<String, String> hashes = new HashMap<>();
@@ -475,6 +484,7 @@ public class Java9ToJava8Desugarer {
         File parent = cacheFile.getParentFile();
         if (parent != null && !parent.exists() && !parent.mkdirs()) {
             System.err.println("Warning: unable to create cache dir: " + parent.getAbsolutePath());
+            return;
         }
         Properties props = new Properties();
         props.setProperty(CACHE_VERSION_KEY, CACHE_VERSION);
