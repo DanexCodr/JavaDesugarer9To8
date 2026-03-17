@@ -188,11 +188,6 @@ public class Java9ToJava8Desugarer {
                                         bytes = readAllBytes(cachedStream);
                                     }
                                     stats.entriesReused++;
-                                    if (name.endsWith(".class")) {
-                                        stats.classesProcessed++;
-                                    } else {
-                                        stats.otherEntries++;
-                                    }
                                     writeEntry(jos, name, bytes, written);
                                     continue;
                                 }
@@ -369,7 +364,7 @@ public class Java9ToJava8Desugarer {
         File cacheFile;
     }
 
-    public static class IncrementalConfig {
+    private static class IncrementalConfig {
         public final boolean enabled;
         public final File cacheFile;
 
