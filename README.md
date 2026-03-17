@@ -246,3 +246,39 @@ desugar any JAR attached to the latest release.
   `java.lang.ModuleLayer`, and related APIs introduced in Java 9 are not
   remapped. These will result in `NoSuchMethodError` or
   `ClassNotFoundException` when the desugared JAR is run on Java 8.
+- **InputStream subtype calls not remapped** – The API remapping for
+  `transferTo()`, `readAllBytes()`, and `readNBytes()` only fires when the
+  bytecode call-site owner is exactly `java/io/InputStream`. If the declared
+  type at the call site is a concrete subclass (e.g., `FileInputStream`,
+  `BufferedInputStream`, `ByteArrayInputStream`), the call will **not** be
+  rewritten and will throw `NoSuchMethodError` on Java 8.
+- **`takeWhile` and `dropWhile` are eager and sequential** – The backport
+  implementations (`StreamBackport.takeWhile` / `StreamBackport.dropWhile`)
+  eagerly collect elements into a `List` before returning a new stream.
+  Consequences: (a) an infinite input stream will block indefinitely or
+  exhaust heap memory; (b) parallel streams are silently converted to
+  sequential; (c) stream characteristics such as `SORTED` and `DISTINCT` are
+  not preserved in the output stream.
+- **`Collectors.filtering()` and `Collectors.flatMapping()` not covered** –
+  These `java.util.stream.Collectors` factory methods added in Java 9 are not
+  remapped. Using them in code compiled with Java 9 will result in
+  `NoSuchMethodError` when the desugared JAR runs on Java 8.
+- **`CompletableFuture.minimalCompletionStage()` and `newIncompleteFuture()`
+  not covered** – These two Java 9 additions to `CompletableFuture` are not
+  remapped and will throw `NoSuchMethodError` on Java 8.
+- **`orTimeout` / `completeOnTimeout` timer tasks are not cancelled on early
+  completion** – In Java 9, when the future completes before the timeout the
+  associated timer task is cancelled. The backport schedules the task but never
+  cancels it; the task fires at the deadline and becomes a no-op (since the
+  future is already done). In scenarios with many short-lived futures the
+  scheduler queue may accumulate un-cancelled tasks until each one fires.
+- **`completedStage()` returns a full `CompletableFuture`** – Java 9's
+  `CompletableFuture.completedStage(v)` returns a *minimal-stage* object that
+  restricts the public interface to `CompletionStage`, so casting it to
+  `CompletableFuture` throws `ClassCastException`. The backport returns a
+  plain `CompletableFuture`, which allows such a cast to succeed. Code that
+  relies on the cast failing will behave differently after desugaring.
+- **`List/Set/Map.copyOf()` are Java 10 additions** – These methods are
+  correctly remapped to `CollectionBackport`, but they were introduced in
+  Java 10, not Java 9. The tool's coverage therefore extends slightly beyond
+  Java 9 for these three methods.
