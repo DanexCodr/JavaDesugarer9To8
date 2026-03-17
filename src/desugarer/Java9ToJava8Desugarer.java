@@ -51,6 +51,9 @@ public class Java9ToJava8Desugarer {
     private static final String CACHE_INPUT_KEY = "__inputPath";
     private static final String CACHE_OUTPUT_KEY = "__outputPath";
     private static final String CACHE_VERSION = "1";
+    private static final String DEFAULT_CACHE_DIR = "build/.desugar-cache";
+    private static final String TEMURIN_TOKEN = "temurin";
+    private static final String ADOPTIUM_TOKEN = "adoptium";
 
     // ── Backport class source-file paths (relative to src/) ─────────────────
     private static final String[] BACKPORT_CLASSES = {
@@ -362,7 +365,7 @@ public class Java9ToJava8Desugarer {
         String backportDir;
         boolean incremental;
         boolean showHelp;
-        File cacheDir = new File("build/.desugar-cache");
+        File cacheDir = new File(DEFAULT_CACHE_DIR);
         File cacheFile;
     }
 
@@ -435,7 +438,7 @@ public class Java9ToJava8Desugarer {
         String vmName = System.getProperty("java.vm.name", "");
         String combined = (vendor + " " + runtime + " " + vmVendor + " " + vmName)
                 .toLowerCase(Locale.ROOT);
-        if (!combined.contains("temurin") && !combined.contains("adoptium")) {
+        if (!combined.contains(TEMURIN_TOKEN) && !combined.contains(ADOPTIUM_TOKEN)) {
             System.err.println("Unsupported Java runtime detected.");
             System.err.println("This tool is supported only on Eclipse Temurin (Adoptium).");
             System.err.println("Detected: " + vendor + " / " + runtime + " / " + vmVendor);
