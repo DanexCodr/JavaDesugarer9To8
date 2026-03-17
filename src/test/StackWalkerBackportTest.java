@@ -18,6 +18,7 @@ public final class StackWalkerBackportTest {
     static void run() {
         section("StackWalkerBackport");
 
+        testDescriptorCacheLimitProperty();
         testWalk();
         testCallerClass();
         testForEach();
@@ -25,6 +26,28 @@ public final class StackWalkerBackportTest {
         testMethodDescriptor();
         testClassReferenceOption();
         testMaxDepth();
+    }
+
+    private static void testDescriptorCacheLimitProperty() {
+        String property = "j9compat.stackwalker.cache.size";
+        String original = System.getProperty(property);
+        System.setProperty(property, "4");
+        try {
+            Class<?> resolver = Class.forName("j9compat.StackWalker$MethodDescriptorResolver");
+            java.lang.reflect.Field field = resolver.getDeclaredField("CACHE_LIMIT");
+            field.setAccessible(true);
+            int value = field.getInt(null);
+            assertEquals(4, value,
+                    "StackWalker descriptor cache limit: honors system property");
+        } catch (ReflectiveOperationException | SecurityException e) {
+            fail("StackWalker descriptor cache limit: reflection failed (" + e.getClass().getSimpleName() + ")");
+        } finally {
+            if (original == null) {
+                System.clearProperty(property);
+            } else {
+                System.setProperty(property, original);
+            }
+        }
     }
 
     private static void testWalk() {

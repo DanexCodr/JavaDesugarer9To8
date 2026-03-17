@@ -186,7 +186,8 @@ public final class StackWalker {
     }
 
     private static final class MethodDescriptorResolver {
-        private static final int CACHE_LIMIT = 256;
+        private static final String CACHE_LIMIT_PROPERTY = "j9compat.stackwalker.cache.size";
+        private static final int CACHE_LIMIT = resolveCacheLimit();
         private static final int CLASS_FILE_MAGIC = 0xCAFEBABE;
         private static final Map<String, List<MethodInfo>> CACHE = Collections.synchronizedMap(
                 new LinkedHashMap<String, List<MethodInfo>>(CACHE_LIMIT, 0.75f, true) {
@@ -197,6 +198,19 @@ public final class StackWalker {
                 });
 
         private MethodDescriptorResolver() {}
+
+        private static int resolveCacheLimit() {
+            String value = System.getProperty(CACHE_LIMIT_PROPERTY);
+            if (value == null || value.trim().isEmpty()) {
+                return 256;
+            }
+            try {
+                int parsed = Integer.parseInt(value.trim());
+                return parsed > 0 ? parsed : 256;
+            } catch (NumberFormatException ignored) {
+                return 256;
+            }
+        }
 
         static String resolveDescriptor(StackTraceElement element) {
             String className = element.getClassName();
