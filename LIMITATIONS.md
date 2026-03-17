@@ -2,6 +2,10 @@
 
 ## Unsupported Java 9 APIs (manual migration required)
 
+The desugarer only rewrites the explicit APIs listed in the README. Any other
+Java 9+ additions still reference missing classes or methods on Java 8 and must
+be migrated manually.
+
 - **`VarHandle`** – not automatically replaced; requires manual migration to
   `AtomicFieldUpdater` or `sun.misc.Unsafe`.
 - **`ProcessHandle`** / **`StackWalker`** / **`Flow`** – complex new APIs that
@@ -11,6 +15,14 @@
   `java.lang.ModuleLayer`, and related types are not remapped. The desugarer
   preserves `module-info.class` as metadata, but Java 8 has no JPMS runtime, so
   these APIs will still fail on Java 8.
+- **Primitive streams and Optional primitives** – Java 9 additions on
+  `IntStream` / `LongStream` / `DoubleStream` and `OptionalInt` / `OptionalLong`
+  / `OptionalDouble` are not remapped. Migrate to boxed `Stream`/`Optional` APIs
+  or provide custom helpers.
+- **Reflection/`MethodHandle` lookups are not remapped** – The desugarer only
+  rewrites direct bytecode method invocations. Reflective or `MethodHandle`
+  lookups of Java 9 APIs will still resolve the original methods and need
+  manual migration.
 
 ## Bytecode / behavior differences
 
@@ -32,10 +44,6 @@
   class (for example, due to missing dependencies needed to compute frames),
   the original class bytes are kept. The output JAR may still contain Java 9
   class files in that case.
-- **Reflection/MethodHandle lookups are not remapped** – The desugarer only
-  rewrites direct bytecode method invocations. Reflective or `MethodHandle`
-  lookups of Java 9 APIs will still resolve the original methods and need
-  manual migration.
 
 ## Version coverage notes
 
