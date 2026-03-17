@@ -19,7 +19,7 @@ import java.util.function.Consumer;
  */
 public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable {
 
-    static final int MAX_BUFFER_CAPACITY = 1 << 30;
+    static final int BUFFER_CAPACITY_LIMIT = 1 << 30;
 
     private final CopyOnWriteArrayList<BufferedSubscription<T>> subscribers =
             new CopyOnWriteArrayList<BufferedSubscription<T>>();
@@ -49,10 +49,10 @@ public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable 
 
     static int roundCapacity(int capacity) {
         int rounded = 1;
-        while (rounded < capacity && rounded < MAX_BUFFER_CAPACITY) {
+        while (rounded < capacity && rounded < BUFFER_CAPACITY_LIMIT) {
             rounded <<= 1;
         }
-        return Math.min(rounded, MAX_BUFFER_CAPACITY);
+        return Math.min(rounded, BUFFER_CAPACITY_LIMIT);
     }
 
     @Override
@@ -112,9 +112,10 @@ public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable 
     }
 
     public void closeExceptionally(Throwable error) {
-        closedException = error == null
-                ? new NullPointerException("closeExceptionally() requires non-null error parameter")
-                : error;
+        if (error == null) {
+            throw new NullPointerException("closeExceptionally() requires non-null error parameter");
+        }
+        closedException = error;
         closed = true;
         for (BufferedSubscription<T> subscription : subscribers) {
             subscription.signalClose(closedException);

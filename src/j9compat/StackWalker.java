@@ -326,7 +326,7 @@ public final class StackWalker {
                         break;
                     default:
                         throw new IOException("Unknown constant pool tag " + tag + " in "
-                                + className + " (expected supported tags 1,3-12,15,16,18-20)");
+                                + className + " (expected supported tags 1,3-12,15-16,18-20)");
                 }
             }
             return utf8;
@@ -436,7 +436,7 @@ public final class StackWalker {
             if (clazz == null) {
                 return null;
             }
-            MethodInfo unique = null;
+            MethodInfo candidate = null;
             for (Method method : clazz.getDeclaredMethods()) {
                 if (!method.getName().equals(methodName)) {
                     continue;
@@ -444,13 +444,13 @@ public final class StackWalker {
                 MethodInfo info = new MethodInfo(methodName,
                         methodDescriptor(method.getParameterTypes(), method.getReturnType()),
                         -1, -1);
-                if (unique != null) {
+                if (candidate != null) {
                     return null;
                 }
-                unique = info;
+                candidate = info;
             }
-            if (unique != null) {
-                return unique;
+            if (candidate != null) {
+                return candidate;
             }
             if ("<init>".equals(methodName)) {
                 Constructor<?>[] constructors = clazz.getDeclaredConstructors();
