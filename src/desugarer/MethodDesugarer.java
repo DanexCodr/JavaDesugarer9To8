@@ -1,6 +1,10 @@
 package desugarer;
 
 import org.objectweb.asm.*;
+import org.objectweb.asm.commons.LocalVariablesSorter;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * ASM {@link MethodVisitor} that rewrites Java 9-only API calls to equivalent
@@ -26,6 +30,7 @@ import org.objectweb.asm.*;
  *       {@code Map.copyOf}</li>
  *   <li>{@code Stream.takeWhile}, {@code Stream.dropWhile},
  *       {@code Stream.ofNullable}, {@code Stream.iterate(seed,hasNext,f)}</li>
+ *   <li>{@code Collectors.filtering}, {@code Collectors.flatMapping}</li>
  *   <li>{@code Optional.ifPresentOrElse}, {@code Optional.or},
  *       {@code Optional.stream}</li>
  *   <li>{@code InputStream.transferTo}, {@code InputStream.readAllBytes},
@@ -36,10 +41,12 @@ import org.objectweb.asm.*;
  *       {@code CompletableFuture.completeOnTimeout},
  *       {@code CompletableFuture.failedFuture},
  *       {@code CompletableFuture.completedStage},
- *       {@code CompletableFuture.failedStage}</li>
+ *       {@code CompletableFuture.failedStage},
+ *       {@code CompletableFuture.minimalCompletionStage},
+ *       {@code CompletableFuture.newIncompleteFuture}</li>
  * </ul>
  */
-public class MethodDesugarer extends MethodVisitor {
+public class MethodDesugarer extends LocalVariablesSorter {
 
     // Backport class internal names (JVM-style, '/' not '.')
     private static final String BP_COLLECTION  = "j9compat/CollectionBackport";
@@ -48,11 +55,13 @@ public class MethodDesugarer extends MethodVisitor {
     private static final String BP_IO          = "j9compat/IOBackport";
     private static final String BP_OBJECTS     = "j9compat/ObjectsBackport";
     private static final String BP_CF          = "j9compat/CompletableFutureBackport";
+    private static final String BP_COLLECTORS  = "j9compat/CollectorsBackport";
 
     private final Java9ToJava8Desugarer.Stats stats;
 
-    public MethodDesugarer(MethodVisitor mv, Java9ToJava8Desugarer.Stats stats) {
-        super(Opcodes.ASM9, mv);
+    public MethodDesugarer(int access, String descriptor, MethodVisitor mv,
+                           Java9ToJava8Desugarer.Stats stats) {
+        super(Opcodes.ASM9, access, descriptor, mv);
         this.stats = stats;
     }
 
@@ -121,6 +130,16 @@ public class MethodDesugarer extends MethodVisitor {
             }
         }
 
+        // ── java.util.stream.Collectors additions ────────────────────────────
+        if ("java/util/stream/Collectors".equals(owner)) {
+            if ("filtering".equals(name)) {
+                remap(BP_COLLECTORS, "filtering", descriptor); return;
+            }
+            if ("flatMapping".equals(name)) {
+                remap(BP_COLLECTORS, "flatMapping", descriptor); return;
+            }
+        }
+
         // ── java.util.Optional additions ─────────────────────────────────────
         if ("java/util/Optional".equals(owner)) {
             if ("ifPresentOrElse".equals(name)) {
@@ -138,19 +157,20 @@ public class MethodDesugarer extends MethodVisitor {
         }
 
         // ── java.io.InputStream additions ────────────────────────────────────
-        if ("java/io/InputStream".equals(owner)) {
-            if ("transferTo".equals(name)) {
-                remapInstanceToStatic(BP_IO, "transferTo",
-                        "java/io/InputStream", descriptor); return;
-            }
-            if ("readAllBytes".equals(name)) {
-                remapInstanceToStatic(BP_IO, "readAllBytes",
-                        "java/io/InputStream", descriptor); return;
-            }
-            if ("readNBytes".equals(name)) {
-                remapInstanceToStatic(BP_IO, "readNBytes",
-                        "java/io/InputStream", descriptor); return;
-            }
+        if ("transferTo".equals(name)
+                && "(Ljava/io/OutputStream;)J".equals(descriptor)) {
+            remapInstanceToStatic(BP_IO, "transferTo",
+                    "java/io/InputStream", descriptor); return;
+        }
+        if ("readAllBytes".equals(name)
+                && "()[B".equals(descriptor)) {
+            remapInstanceToStatic(BP_IO, "readAllBytes",
+                    "java/io/InputStream", descriptor); return;
+        }
+        if ("readNBytes".equals(name)
+                && ("([BII)I".equals(descriptor) || "(I)[B".equals(descriptor))) {
+            remapInstanceToStatic(BP_IO, "readNBytes",
+                    "java/io/InputStream", descriptor); return;
         }
 
         // ── java.util.Objects additions (Java 9) ─────────────────────────────
@@ -191,6 +211,14 @@ public class MethodDesugarer extends MethodVisitor {
             if ("failedStage".equals(name)) {
                 remap(BP_CF, "failedStage", descriptor); return;
             }
+            if ("minimalCompletionStage".equals(name)) {
+                remapInstanceToStatic(BP_CF, "minimalCompletionStage",
+                        "java/util/concurrent/CompletableFuture", descriptor); return;
+            }
+            if ("newIncompleteFuture".equals(name)) {
+                remapInstanceToStatic(BP_CF, "newIncompleteFuture",
+                        "java/util/concurrent/CompletableFuture", descriptor); return;
+            }
             if ("copy".equals(name)) {
                 remapInstanceToStatic(BP_CF, "copy",
                         "java/util/concurrent/CompletableFuture", descriptor); return;
@@ -199,6 +227,21 @@ public class MethodDesugarer extends MethodVisitor {
 
         // No remapping needed – emit unchanged
         super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+    }
+
+    @Override
+    public void visitInvokeDynamicInsn(String name, String descriptor,
+                                       Handle bootstrapMethodHandle,
+                                       Object... bootstrapMethodArguments) {
+        if (isStringConcatBootstrap(bootstrapMethodHandle, descriptor)) {
+            if (emitStringConcat(descriptor, bootstrapMethodHandle,
+                    bootstrapMethodArguments)) {
+                stats.apiCallsRemapped++;
+                return;
+            }
+        }
+        super.visitInvokeDynamicInsn(name, descriptor, bootstrapMethodHandle,
+                bootstrapMethodArguments);
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -244,5 +287,228 @@ public class MethodDesugarer extends MethodVisitor {
     static String prependReceiver(String receiverInternalName, String descriptor) {
         // descriptor starts with '('
         return "(L" + receiverInternalName + ";" + descriptor.substring(1);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    //  String concat (invokedynamic) handling
+    // ────────────────────────────────────────────────────────────────────────
+
+    private static boolean isStringConcatBootstrap(Handle handle, String descriptor) {
+        return "java/lang/invoke/StringConcatFactory".equals(handle.getOwner())
+                && ("makeConcatWithConstants".equals(handle.getName())
+                    || "makeConcat".equals(handle.getName()))
+                && Type.getReturnType(descriptor).getSort() == Type.OBJECT
+                && "java/lang/String".equals(Type.getReturnType(descriptor).getInternalName());
+    }
+
+    private boolean emitStringConcat(String descriptor, Handle bootstrapMethodHandle,
+                                     Object[] bootstrapMethodArguments) {
+        Type[] argTypes = Type.getArgumentTypes(descriptor);
+        List<ConcatSegment> segments = parseConcatSegments(argTypes,
+                bootstrapMethodHandle, bootstrapMethodArguments);
+        if (segments == null) {
+            return false;
+        }
+
+        int[] locals = new int[argTypes.length];
+        for (int i = argTypes.length - 1; i >= 0; i--) {
+            locals[i] = newLocal(argTypes[i]);
+            super.visitVarInsn(argTypes[i].getOpcode(Opcodes.ISTORE), locals[i]);
+        }
+
+        super.visitTypeInsn(Opcodes.NEW, "java/lang/StringBuilder");
+        super.visitInsn(Opcodes.DUP);
+        super.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder",
+                "<init>", "()V", false);
+
+        for (ConcatSegment segment : segments) {
+            if (segment.kind == ConcatSegmentKind.LITERAL) {
+                super.visitLdcInsn(segment.literal);
+                super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder",
+                        "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+            } else if (segment.kind == ConcatSegmentKind.ARG) {
+                appendArgument(argTypes[segment.index], locals[segment.index]);
+            } else if (segment.kind == ConcatSegmentKind.CONSTANT) {
+                appendConstant(segment.constant);
+            }
+        }
+
+        super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder",
+                "toString", "()Ljava/lang/String;", false);
+        System.out.println("  [REMAP]  invokedynamic StringConcatFactory → StringBuilder");
+        return true;
+    }
+
+    private List<ConcatSegment> parseConcatSegments(Type[] argTypes,
+                                                    Handle bootstrapMethodHandle,
+                                                    Object[] bootstrapMethodArguments) {
+        if ("makeConcat".equals(bootstrapMethodHandle.getName())) {
+            List<ConcatSegment> segments = new ArrayList<>();
+            for (int i = 0; i < argTypes.length; i++) {
+                segments.add(ConcatSegment.argument(i));
+            }
+            return segments;
+        }
+
+        if (bootstrapMethodArguments == null
+                || bootstrapMethodArguments.length == 0
+                || !(bootstrapMethodArguments[0] instanceof String)) {
+            return null;
+        }
+
+        String recipe = (String) bootstrapMethodArguments[0];
+        List<ConcatSegment> segments = new ArrayList<>();
+        StringBuilder literal = new StringBuilder();
+        int argIndex = 0;
+        int constIndex = 1;
+        for (int i = 0; i < recipe.length(); i++) {
+            char c = recipe.charAt(i);
+            if (c == '\u0001') {
+                if (literal.length() > 0) {
+                    segments.add(ConcatSegment.literal(literal.toString()));
+                    literal.setLength(0);
+                }
+                if (argIndex >= argTypes.length) {
+                    return null;
+                }
+                segments.add(ConcatSegment.argument(argIndex++));
+            } else if (c == '\u0002') {
+                if (literal.length() > 0) {
+                    segments.add(ConcatSegment.literal(literal.toString()));
+                    literal.setLength(0);
+                }
+                if (constIndex >= bootstrapMethodArguments.length) {
+                    return null;
+                }
+                segments.add(ConcatSegment.constant(bootstrapMethodArguments[constIndex++]));
+            } else {
+                literal.append(c);
+            }
+        }
+
+        if (literal.length() > 0) {
+            segments.add(ConcatSegment.literal(literal.toString()));
+        }
+
+        if (argIndex != argTypes.length) {
+            return null;
+        }
+        return segments;
+    }
+
+    private void appendArgument(Type type, int local) {
+        super.visitVarInsn(type.getOpcode(Opcodes.ILOAD), local);
+        appendType(type);
+    }
+
+    private void appendConstant(Object constant) {
+        if (constant instanceof Integer) {
+            super.visitLdcInsn(((Integer) constant).intValue());
+            appendType(Type.INT_TYPE);
+            return;
+        }
+        if (constant instanceof Long) {
+            super.visitLdcInsn(((Long) constant).longValue());
+            appendType(Type.LONG_TYPE);
+            return;
+        }
+        if (constant instanceof Float) {
+            super.visitLdcInsn(((Float) constant).floatValue());
+            appendType(Type.FLOAT_TYPE);
+            return;
+        }
+        if (constant instanceof Double) {
+            super.visitLdcInsn(((Double) constant).doubleValue());
+            appendType(Type.DOUBLE_TYPE);
+            return;
+        }
+        if (constant instanceof String) {
+            super.visitLdcInsn(constant);
+            super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder",
+                    "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+            return;
+        }
+        super.visitLdcInsn(constant);
+        appendType(Type.getType(Object.class));
+    }
+
+    private void appendType(Type type) {
+        String descriptor;
+        switch (type.getSort()) {
+            case Type.BOOLEAN:
+                descriptor = "(Z)Ljava/lang/StringBuilder;";
+                break;
+            case Type.CHAR:
+                descriptor = "(C)Ljava/lang/StringBuilder;";
+                break;
+            case Type.BYTE:
+                descriptor = "(B)Ljava/lang/StringBuilder;";
+                break;
+            case Type.SHORT:
+                descriptor = "(S)Ljava/lang/StringBuilder;";
+                break;
+            case Type.INT:
+                descriptor = "(I)Ljava/lang/StringBuilder;";
+                break;
+            case Type.FLOAT:
+                descriptor = "(F)Ljava/lang/StringBuilder;";
+                break;
+            case Type.LONG:
+                descriptor = "(J)Ljava/lang/StringBuilder;";
+                break;
+            case Type.DOUBLE:
+                descriptor = "(D)Ljava/lang/StringBuilder;";
+                break;
+            case Type.ARRAY:
+                if (type.getElementType().getSort() == Type.CHAR) {
+                    descriptor = "([C)Ljava/lang/StringBuilder;";
+                    break;
+                }
+                descriptor = "(Ljava/lang/Object;)Ljava/lang/StringBuilder;";
+                break;
+            case Type.OBJECT:
+                if ("java/lang/String".equals(type.getInternalName())) {
+                    descriptor = "(Ljava/lang/String;)Ljava/lang/StringBuilder;";
+                } else {
+                    descriptor = "(Ljava/lang/Object;)Ljava/lang/StringBuilder;";
+                }
+                break;
+            default:
+                descriptor = "(Ljava/lang/Object;)Ljava/lang/StringBuilder;";
+        }
+        super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder",
+                "append", descriptor, false);
+    }
+
+    private enum ConcatSegmentKind {
+        LITERAL,
+        ARG,
+        CONSTANT
+    }
+
+    private static final class ConcatSegment {
+        private final ConcatSegmentKind kind;
+        private final String literal;
+        private final int index;
+        private final Object constant;
+
+        private ConcatSegment(ConcatSegmentKind kind, String literal, int index, Object constant) {
+            this.kind = kind;
+            this.literal = literal;
+            this.index = index;
+            this.constant = constant;
+        }
+
+        static ConcatSegment literal(String value) {
+            return new ConcatSegment(ConcatSegmentKind.LITERAL, value, -1, null);
+        }
+
+        static ConcatSegment argument(int index) {
+            return new ConcatSegment(ConcatSegmentKind.ARG, null, index, null);
+        }
+
+        static ConcatSegment constant(Object constant) {
+            return new ConcatSegment(ConcatSegmentKind.CONSTANT, null, -1, constant);
+        }
     }
 }

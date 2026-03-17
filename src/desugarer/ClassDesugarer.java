@@ -67,6 +67,6 @@ public class ClassDesugarer extends ClassVisitor {
                 signature, exceptions);
         if (mv == null) return null;
 
-        return new MethodDesugarer(mv, stats);
+        return new MethodDesugarer(access, descriptor, mv, stats);
     }
 }

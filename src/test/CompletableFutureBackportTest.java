@@ -25,6 +25,12 @@ public final class CompletableFutureBackportTest {
         section("CompletableFutureBackport – failedStage");
         testFailedStage();
 
+        section("CompletableFutureBackport – minimalCompletionStage");
+        testMinimalCompletionStage();
+
+        section("CompletableFutureBackport – newIncompleteFuture");
+        testNewIncompleteFuture();
+
         section("CompletableFutureBackport – copy");
         testCopy();
 
@@ -64,6 +70,8 @@ public final class CompletableFutureBackportTest {
         CompletionStage<String> stage = CompletableFutureBackport.completedStage("result");
         assertEquals("result", stage.toCompletableFuture().get(),
                 "completedStage: value is accessible");
+        assertTrue(!(stage instanceof CompletableFuture),
+                "completedStage: minimal stage is not a CompletableFuture");
 
         // Null value is allowed (same as CompletableFuture.completedFuture(null))
         CompletionStage<String> nullStage = CompletableFutureBackport.completedStage(null);
@@ -91,6 +99,42 @@ public final class CompletableFutureBackportTest {
         assertThrows(NullPointerException.class,
                 () -> CompletableFutureBackport.failedStage(null),
                 "failedStage(null): throws NPE");
+        assertTrue(!(stage instanceof CompletableFuture),
+                "failedStage: minimal stage is not a CompletableFuture");
+    }
+
+    // ── minimalCompletionStage ───────────────────────────────────────────────
+
+    static void testMinimalCompletionStage() throws Exception {
+        CompletableFuture<String> base = new CompletableFuture<>();
+        CompletionStage<String> stage = CompletableFutureBackport.minimalCompletionStage(base);
+        assertTrue(!(stage instanceof CompletableFuture),
+                "minimalCompletionStage: wrapper is not CompletableFuture");
+
+        base.complete("done");
+        assertEquals("done", stage.toCompletableFuture().get(1, TimeUnit.SECONDS),
+                "minimalCompletionStage: completion shared with base future");
+
+        assertThrows(NullPointerException.class,
+                () -> CompletableFutureBackport.minimalCompletionStage(null),
+                "minimalCompletionStage(null): throws NPE");
+    }
+
+    // ── newIncompleteFuture ──────────────────────────────────────────────────
+
+    static void testNewIncompleteFuture() throws Exception {
+        CompletableFuture<String> base = new CompletableFuture<>();
+        CompletableFuture<String> created = CompletableFutureBackport.newIncompleteFuture(base);
+        assertTrue(created != base, "newIncompleteFuture: returns new instance");
+        assertTrue(!created.isDone(), "newIncompleteFuture: starts incomplete");
+
+        created.complete("value");
+        assertEquals("value", created.get(1, TimeUnit.SECONDS),
+                "newIncompleteFuture: completion works");
+
+        assertThrows(NullPointerException.class,
+                () -> CompletableFutureBackport.newIncompleteFuture(null),
+                "newIncompleteFuture(null): throws NPE");
     }
 
     // ── copy ──────────────────────────────────────────────────────────────────
