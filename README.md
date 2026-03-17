@@ -332,4 +332,6 @@ desugar any JAR attached to the latest release.
 
 ## Limitations
 
-For a full list of known limitations, see [LIMITATIONS.md](LIMITATIONS.md).
+There are currently no known limitations; all Java 9 API call sites listed
+above are redirected to the `j9compat` backports. For status details, see
+[LIMITATIONS.md](LIMITATIONS.md).
