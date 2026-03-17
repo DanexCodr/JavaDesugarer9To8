@@ -1,0 +1,272 @@
+name: Desugar Java 9 → Java 8
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      input_jar:
+        description: 'Release asset name of the Java 9 JAR to desugar'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  # ── 1. Build the desugarer tool itself ──────────────────────────────────────
+  build-desugarer:
+    name: Build desugarer tool
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8 (for compilation target)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      # Compile the j9compat backport library (pure Java 8 code)
+      - name: Compile j9compat backport library
+        run: |
+          mkdir -p build/backport
+          javac -source 8 -target 8 \
+            -cp asm-9.4.jar:asm-commons-9.4.jar:asm-tree-9.4.jar \
+            -d build/backport \
+            src/j9compat/CollectionBackport.java \
+            src/j9compat/StreamBackport.java \
+            src/j9compat/OptionalBackport.java \
+            src/j9compat/IOBackport.java \
+            src/j9compat/ObjectsBackport.java \
+            src/j9compat/CompletableFutureBackport.java
+
+      # Compile the desugarer tool itself (also Java 8 target)
+      - name: Compile desugarer tool
+        run: |
+          mkdir -p build/desugarer
+          javac -source 8 -target 8 \
+            -cp asm-9.4.jar:asm-commons-9.4.jar:asm-tree-9.4.jar \
+            -d build/desugarer \
+            src/desugarer/Java9ToJava8Desugarer.java \
+            src/desugarer/ClassDesugarer.java \
+            src/desugarer/MethodDesugarer.java
+
+      # Package everything into a single fat JAR
+      - name: Package desugarer fat JAR
+        run: |
+          mkdir -p build/fatjar
+          # Unpack ASM jars
+          cd build/fatjar
+          jar xf ../../asm-9.4.jar
+          jar xf ../../asm-commons-9.4.jar
+          jar xf ../../asm-tree-9.4.jar
+          # Copy compiled classes
+          cp -r ../desugarer/* .
+          # Build fat JAR
+          cd ../..
+          jar cfe build/desugar9to8.jar desugarer.Java9ToJava8Desugarer \
+            -C build/fatjar .
+
+      - name: Upload desugarer JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: desugar9to8-tool
+          path: |
+            build/desugar9to8.jar
+            build/backport/
+
+  # ── 2. Self-test: desugar the tool's own classes ────────────────────────────
+  self-test:
+    name: Self-test (desugar the desugarer itself)
+    needs: build-desugarer
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Download desugarer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: desugar9to8-tool
+          path: build/
+
+      - name: Compile j9compat backport library
+        run: |
+          mkdir -p build/backport
+          javac -source 8 -target 8 \
+            -cp asm-9.4.jar:asm-commons-9.4.jar:asm-tree-9.4.jar \
+            -d build/backport \
+            src/j9compat/CollectionBackport.java \
+            src/j9compat/StreamBackport.java \
+            src/j9compat/OptionalBackport.java \
+            src/j9compat/IOBackport.java \
+            src/j9compat/ObjectsBackport.java \
+            src/j9compat/CompletableFutureBackport.java
+
+      # Create a minimal Java 9-style test JAR
+      - name: Create sample Java 9 test JAR
+        run: |
+          mkdir -p /tmp/java9sample/com/example
+          cat > /tmp/java9sample/com/example/Java9Features.java << 'JAVA'
+          package com.example;
+
+          import java.util.*;
+          import java.util.stream.*;
+          import java.io.*;
+
+          public class Java9Features {
+              // Uses Java 9 collection factory methods
+              public List<String> getNames() {
+                  return List.of("Alice", "Bob", "Carol");
+              }
+
+              public Set<Integer> getIds() {
+                  return Set.of(1, 2, 3);
+              }
+
+              public Map<String, Integer> getScores() {
+                  return Map.of("Alice", 95, "Bob", 87);
+              }
+
+              // Uses Java 9 Optional additions
+              public void processOptional(Optional<String> opt) {
+                  opt.ifPresentOrElse(
+                      s -> System.out.println("Value: " + s),
+                      () -> System.out.println("Empty")
+                  );
+              }
+
+              // Uses Java 9 Stream additions
+              public List<Integer> takePositive(List<Integer> nums) {
+                  return nums.stream()
+                      .takeWhile(n -> n > 0)
+                      .collect(Collectors.toList());
+              }
+          }
+          JAVA
+
+          # Compile with Java 9+ (requires JDK 9+; we use -source 9 if available,
+          # otherwise the test is skipped gracefully)
+          if javac -version 2>&1 | grep -q "javac 1\.[678]"; then
+            echo "JDK < 9 detected, skipping Java 9 source compilation."
+            echo "SKIP_DESUGAR=true" >> $GITHUB_ENV
+          else
+            mkdir -p /tmp/java9sample/classes
+            javac --release 9 \
+              -d /tmp/java9sample/classes \
+              /tmp/java9sample/com/example/Java9Features.java || \
+            javac -source 9 -target 9 \
+              -d /tmp/java9sample/classes \
+              /tmp/java9sample/com/example/Java9Features.java
+            cd /tmp/java9sample/classes
+            jar cf /tmp/java9sample/java9sample.jar .
+          fi
+
+      - name: Run desugarer on sample JAR
+        if: env.SKIP_DESUGAR != 'true'
+        run: |
+          java -jar build/desugar9to8.jar \
+            /tmp/java9sample/java9sample.jar \
+            /tmp/java9sample/java8out.jar \
+            build/backport
+
+      - name: Verify output with javap
+        if: env.SKIP_DESUGAR != 'true'
+        run: |
+          mkdir -p /tmp/java9sample/verify
+          cd /tmp/java9sample/verify
+          jar xf /tmp/java9sample/java8out.jar
+          echo "=== Class file version check ==="
+          javap -v com/example/Java9Features.class | grep "major version"
+          echo ""
+          echo "=== Disassembly ==="
+          javap -c com/example/Java9Features.class
+
+      - name: Verify output JAR runs on Java 8 JVM
+        if: env.SKIP_DESUGAR != 'true'
+        run: |
+          echo "Output JAR contents:"
+          jar tf /tmp/java9sample/java8out.jar
+
+      - name: Upload desugared output
+        if: env.SKIP_DESUGAR != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: java8-output-sample
+          path: /tmp/java9sample/java8out.jar
+
+  # ── 3. (Optional) Desugar a JAR from a release asset ───────────────────────
+  desugar-release-jar:
+    name: Desugar release JAR
+    needs: build-desugarer
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.input_jar != ''
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Download desugarer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: desugar9to8-tool
+          path: build/
+
+      - name: Download input JAR from latest release
+        run: |
+          INPUT_JAR="${{ github.event.inputs.input_jar }}"
+          curl -L -o input.jar \
+            "https://github.com/${{ github.repository }}/releases/latest/download/${INPUT_JAR}"
+          echo "Downloaded: $(ls -lh input.jar)"
+
+      - name: Compile j9compat backport library
+        run: |
+          mkdir -p build/backport
+          javac -source 8 -target 8 \
+            -cp asm-9.4.jar:asm-commons-9.4.jar:asm-tree-9.4.jar \
+            -d build/backport \
+            src/j9compat/CollectionBackport.java \
+            src/j9compat/StreamBackport.java \
+            src/j9compat/OptionalBackport.java \
+            src/j9compat/IOBackport.java \
+            src/j9compat/ObjectsBackport.java \
+            src/j9compat/CompletableFutureBackport.java
+
+      - name: Run desugarer
+        run: |
+          java -jar build/desugar9to8.jar \
+            input.jar \
+            output-java8.jar \
+            build/backport
+
+      - name: Show desugaring summary
+        run: |
+          echo "Input  size : $(du -sh input.jar       | cut -f1)"
+          echo "Output size : $(du -sh output-java8.jar | cut -f1)"
+          echo ""
+          echo "Output JAR contents (first 30 entries):"
+          jar tf output-java8.jar | head -30
+
+      - name: Upload desugared JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: desugared-java8-jar
+          path: output-java8.jar

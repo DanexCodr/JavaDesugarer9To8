@@ -1,0 +1,2 @@
+# Build output – compiled by the CI workflow, not part of the source
+build/
