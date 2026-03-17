@@ -26,7 +26,7 @@ fully **Java 8-compatible** JAR, including a bundled runtime backport library
 | **InputStream additions** | Redirects `transferTo()`, `readAllBytes()`, and `readNBytes()` to `j9compat.IOBackport`. |
 | **Objects additions** | Redirects `requireNonNullElse()`, `requireNonNullElseGet()`, `checkIndex()`, `checkFromToIndex()`, and `checkFromIndexSize()` to `j9compat.ObjectsBackport`. |
 | **CompletableFuture additions** | Redirects `orTimeout()`, `completeOnTimeout()`, `failedFuture()`, `completedStage()`, `failedStage()`, `minimalCompletionStage()`, `newIncompleteFuture()`, and `copy()` to `j9compat.CompletableFutureBackport`. |
-| **Process/Stack/Flow types** | Remaps `ProcessHandle`, `StackWalker`, and `Flow` to Java 8-compatible `j9compat` implementations. |
+| **Process/Stack/Flow types** | Remaps `ProcessHandle`, `StackWalker`, `Flow`, and `SubmissionPublisher` to Java 8-compatible `j9compat` implementations. |
 
 ---
 
@@ -60,7 +60,8 @@ fully **Java 8-compatible** JAR, including a bundled runtime backport library
 │       ├── CompletableFutureBackport.java  CompletableFuture additions
 │       ├── ProcessHandle.java          ProcessHandle backport
 │       ├── StackWalker.java            StackWalker backport
-│       └── Flow.java                   Flow (Reactive Streams) interfaces
+│       ├── Flow.java                   Flow (Reactive Streams) interfaces
+│       └── SubmissionPublisher.java    Reactive Streams publisher implementation
 │
 └── .github/workflows/
     └── desugar-java9-to-java8.yml      CI pipeline
@@ -91,7 +92,8 @@ javac -source 8 -target 8 \
   src/j9compat/CollectorsBackport.java \
   src/j9compat/ProcessHandle.java \
   src/j9compat/StackWalker.java \
-  src/j9compat/Flow.java
+  src/j9compat/Flow.java \
+  src/j9compat/SubmissionPublisher.java
 
 # 2. Compile the desugarer tool
 mkdir -p build/desugarer
@@ -242,6 +244,7 @@ cf.copy()                            --> CompletableFutureBackport.copy(cf)
 ProcessHandle.current()        --> j9compat.ProcessHandle.current()
 StackWalker.getInstance()      --> j9compat.StackWalker.getInstance()
 Flow.Publisher<T>              --> j9compat.Flow.Publisher<T>
+SubmissionPublisher<T>         --> j9compat.SubmissionPublisher<T>
 ```
 
 ---

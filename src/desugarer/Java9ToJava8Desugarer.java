@@ -77,6 +77,7 @@ public class Java9ToJava8Desugarer {
         "j9compat/Flow$Subscriber.class",
         "j9compat/Flow$Subscription.class",
         "j9compat/Flow$Processor.class",
+        "j9compat/SubmissionPublisher.class",
         "j9compat/StackWalker.class",
         "j9compat/StackWalker$Option.class",
         "j9compat/StackWalker$StackFrame.class",

@@ -2,6 +2,7 @@ package test;
 
 import j9compat.StackWalker;
 
+import java.lang.invoke.MethodType;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -21,6 +22,7 @@ public final class StackWalkerBackportTest {
         testCallerClass();
         testForEach();
         testFrameDetails();
+        testMethodDescriptor();
         testClassReferenceOption();
         testMaxDepth();
     }
@@ -72,10 +74,27 @@ public final class StackWalkerBackportTest {
         assertTrue(!frame.isNativeMethod(), "StackFrame.isNativeMethod: false for Java frame");
         assertTrue(frame.toStackTraceElement() != null,
                 "StackFrame.toStackTraceElement: available");
-        assertThrows(UnsupportedOperationException.class, frame::getMethodType,
-                "StackFrame.getMethodType: unsupported");
-        assertThrows(UnsupportedOperationException.class, frame::getDescriptor,
-                "StackFrame.getDescriptor: unsupported");
+        assertTrue(frame.getDescriptor() != null, "StackFrame.getDescriptor: available");
+        assertTrue(frame.getMethodType() != null, "StackFrame.getMethodType: available");
+    }
+
+    private static void testMethodDescriptor() {
+        StackWalker.StackFrame frame = frameForDescriptor();
+        String descriptor = frame.getDescriptor();
+        assertEquals("()Lj9compat/StackWalker$StackFrame;", descriptor,
+                "StackFrame.getDescriptor: resolves descriptor for current method");
+        MethodType expected = MethodType.fromMethodDescriptorString(
+                descriptor, StackWalkerBackportTest.class.getClassLoader());
+        assertEquals(expected, frame.getMethodType(),
+                "StackFrame.getMethodType: matches descriptor");
+    }
+
+    private static StackWalker.StackFrame frameForDescriptor() {
+        StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
+        return walker.walk(stream -> stream
+                .filter(frame -> "frameForDescriptor".equals(frame.getMethodName()))
+                .findFirst()
+                .get());
     }
 
     private static void testClassReferenceOption() {

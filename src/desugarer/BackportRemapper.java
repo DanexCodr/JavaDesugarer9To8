@@ -23,6 +23,7 @@ public final class BackportRemapper extends Remapper {
         TYPE_MAP.put("java/util/concurrent/Flow$Subscriber", "j9compat/Flow$Subscriber");
         TYPE_MAP.put("java/util/concurrent/Flow$Subscription", "j9compat/Flow$Subscription");
         TYPE_MAP.put("java/util/concurrent/Flow$Processor", "j9compat/Flow$Processor");
+        TYPE_MAP.put("java/util/concurrent/SubmissionPublisher", "j9compat/SubmissionPublisher");
     }
 
     @Override
