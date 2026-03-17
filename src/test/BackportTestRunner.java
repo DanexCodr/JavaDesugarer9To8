@@ -73,10 +73,14 @@ public final class BackportTestRunner {
         ObjectsBackportTest.run();
         CollectionBackportTest.run();
         StreamBackportTest.run();
+        PrimitiveStreamBackportTest.run();
         CollectorsBackportTest.run();
         OptionalBackportTest.run();
+        OptionalPrimitiveBackportTest.run();
         IOBackportTest.run();
         CompletableFutureBackportTest.run();
+        ProcessHandleBackportTest.run();
+        StackWalkerBackportTest.run();
 
         System.out.println("\n=== Results ===");
         System.out.println("Passed : " + passed);

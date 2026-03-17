@@ -8,17 +8,10 @@ be migrated manually.
 
 - **`VarHandle`** – not automatically replaced; requires manual migration to
   `AtomicFieldUpdater` or `sun.misc.Unsafe`.
-- **`ProcessHandle`** / **`StackWalker`** / **`Flow`** – complex new APIs that
-  are not automatically replaced. Applications using these must be migrated
-  manually.
 - **Module system APIs** – Calls to `Class.getModule()`, `java.lang.Module`,
   `java.lang.ModuleLayer`, and related types are not remapped. The desugarer
   preserves `module-info.class` as metadata, but Java 8 has no JPMS runtime, so
   these APIs will still fail on Java 8.
-- **Primitive streams and Optional primitives** – Java 9 additions on
-  `IntStream` / `LongStream` / `DoubleStream` and `OptionalInt` / `OptionalLong`
-  / `OptionalDouble` are not remapped. Migrate to boxed `Stream`/`Optional` APIs
-  or provide custom helpers.
 - **Reflection/`MethodHandle` lookups are not remapped** – The desugarer only
   rewrites direct bytecode method invocations. Reflective or `MethodHandle`
   lookups of Java 9 APIs will still resolve the original methods and need
@@ -26,8 +19,8 @@ be migrated manually.
 
 ## Bytecode / behavior differences
 
-- **`takeWhile` / `dropWhile` spliterators are non-splittable** – The backport
-  is now lazy, but its spliterators do not split, so parallel streams will not
+- **`takeWhile` / `dropWhile` spliterators are non-splittable** – The backports
+  are lazy, but their spliterators do not split, so parallel streams will not
   parallelize and `SIZED`/`SUBSIZED` characteristics are cleared.
 - **String concatenation performance** – `invokedynamic` string concatenation
   is rewritten to `StringBuilder` bytecode. The output is functionally correct
@@ -44,6 +37,20 @@ be migrated manually.
   class (for example, due to missing dependencies needed to compute frames),
   the original class bytes are kept. The output JAR may still contain Java 9
   class files in that case.
+
+## Backport behavior notes
+
+- **`ProcessHandle` is scoped to the current process and known child processes** –
+  `ProcessHandle.current()` and `Process.toHandle()` are supported, but
+  `parent()`, `children()`, and `descendants()` return empty results. The
+  `info()` payload only includes best-effort values (command line, start time,
+  and user where available).
+- **`StackWalker` uses stack traces** – Frames are derived from
+  `Thread.getStackTrace()` and do not expose hidden frames or bytecode indices.
+  `StackFrame.getDeclaringClass()` requires
+  `StackWalker.Option.RETAIN_CLASS_REFERENCE`.
+- **`Flow` is interface-only** – The backport provides the reactive-stream
+  interfaces and default buffer size, but no runtime implementation.
 
 ## Version coverage notes
 

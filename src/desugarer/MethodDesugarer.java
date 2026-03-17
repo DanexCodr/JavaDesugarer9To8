@@ -30,11 +30,16 @@ import java.util.List;
  *       {@code Map.copyOf}</li>
  *   <li>{@code Stream.takeWhile}, {@code Stream.dropWhile},
  *       {@code Stream.ofNullable}, {@code Stream.iterate(seed,hasNext,f)}</li>
+ *   <li>{@code IntStream/LongStream/DoubleStream.takeWhile},
+ *       {@code dropWhile}, {@code iterate(seed,hasNext,f)}</li>
  *   <li>{@code Collectors.filtering}, {@code Collectors.flatMapping}</li>
  *   <li>{@code Optional.ifPresentOrElse}, {@code Optional.or},
  *       {@code Optional.stream}</li>
+ *   <li>{@code OptionalInt/Long/Double.ifPresentOrElse},
+ *       {@code OptionalInt/Long/Double.stream}</li>
  *   <li>{@code InputStream.transferTo}, {@code InputStream.readAllBytes},
  *       {@code InputStream.readNBytes}</li>
+ *   <li>{@code Process.toHandle}</li>
  *   <li>{@code Objects.requireNonNullElse}, {@code Objects.requireNonNullElseGet},
  *       {@code Objects.checkIndex}</li>
  *   <li>{@code CompletableFuture.orTimeout},
@@ -51,11 +56,18 @@ public class MethodDesugarer extends LocalVariablesSorter {
     // Backport class internal names (JVM-style, '/' not '.')
     private static final String BP_COLLECTION  = "j9compat/CollectionBackport";
     private static final String BP_STREAM      = "j9compat/StreamBackport";
+    private static final String BP_INT_STREAM  = "j9compat/IntStreamBackport";
+    private static final String BP_LONG_STREAM = "j9compat/LongStreamBackport";
+    private static final String BP_DOUBLE_STREAM = "j9compat/DoubleStreamBackport";
     private static final String BP_OPTIONAL    = "j9compat/OptionalBackport";
+    private static final String BP_OPTIONAL_INT = "j9compat/OptionalIntBackport";
+    private static final String BP_OPTIONAL_LONG = "j9compat/OptionalLongBackport";
+    private static final String BP_OPTIONAL_DOUBLE = "j9compat/OptionalDoubleBackport";
     private static final String BP_IO          = "j9compat/IOBackport";
     private static final String BP_OBJECTS     = "j9compat/ObjectsBackport";
     private static final String BP_CF          = "j9compat/CompletableFutureBackport";
     private static final String BP_COLLECTORS  = "j9compat/CollectorsBackport";
+    private static final String BP_PROCESS_HANDLE = "j9compat/ProcessHandle";
 
     private final Java9ToJava8Desugarer.Stats stats;
 
@@ -130,6 +142,54 @@ public class MethodDesugarer extends LocalVariablesSorter {
             }
         }
 
+        // ── java.util.stream.IntStream additions ──────────────────────────────
+        if ("java/util/stream/IntStream".equals(owner)) {
+            if ("takeWhile".equals(name)) {
+                remapInstanceToStatic(BP_INT_STREAM, "takeWhile",
+                        "java/util/stream/IntStream", descriptor); return;
+            }
+            if ("dropWhile".equals(name)) {
+                remapInstanceToStatic(BP_INT_STREAM, "dropWhile",
+                        "java/util/stream/IntStream", descriptor); return;
+            }
+            if ("iterate".equals(name)
+                    && descriptor.contains("Ljava/util/function/IntPredicate;")) {
+                remap(BP_INT_STREAM, "iterate", descriptor); return;
+            }
+        }
+
+        // ── java.util.stream.LongStream additions ─────────────────────────────
+        if ("java/util/stream/LongStream".equals(owner)) {
+            if ("takeWhile".equals(name)) {
+                remapInstanceToStatic(BP_LONG_STREAM, "takeWhile",
+                        "java/util/stream/LongStream", descriptor); return;
+            }
+            if ("dropWhile".equals(name)) {
+                remapInstanceToStatic(BP_LONG_STREAM, "dropWhile",
+                        "java/util/stream/LongStream", descriptor); return;
+            }
+            if ("iterate".equals(name)
+                    && descriptor.contains("Ljava/util/function/LongPredicate;")) {
+                remap(BP_LONG_STREAM, "iterate", descriptor); return;
+            }
+        }
+
+        // ── java.util.stream.DoubleStream additions ───────────────────────────
+        if ("java/util/stream/DoubleStream".equals(owner)) {
+            if ("takeWhile".equals(name)) {
+                remapInstanceToStatic(BP_DOUBLE_STREAM, "takeWhile",
+                        "java/util/stream/DoubleStream", descriptor); return;
+            }
+            if ("dropWhile".equals(name)) {
+                remapInstanceToStatic(BP_DOUBLE_STREAM, "dropWhile",
+                        "java/util/stream/DoubleStream", descriptor); return;
+            }
+            if ("iterate".equals(name)
+                    && descriptor.contains("Ljava/util/function/DoublePredicate;")) {
+                remap(BP_DOUBLE_STREAM, "iterate", descriptor); return;
+            }
+        }
+
         // ── java.util.stream.Collectors additions ────────────────────────────
         if ("java/util/stream/Collectors".equals(owner)) {
             if ("filtering".equals(name)) {
@@ -153,6 +213,38 @@ public class MethodDesugarer extends LocalVariablesSorter {
             if ("stream".equals(name)) {
                 remapInstanceToStatic(BP_OPTIONAL, "stream",
                         "java/util/Optional", descriptor); return;
+            }
+        }
+
+        // ── java.util.OptionalInt/Long/Double additions ───────────────────────
+        if ("java/util/OptionalInt".equals(owner)) {
+            if ("ifPresentOrElse".equals(name)) {
+                remapInstanceToStatic(BP_OPTIONAL_INT, "ifPresentOrElse",
+                        "java/util/OptionalInt", descriptor); return;
+            }
+            if ("stream".equals(name)) {
+                remapInstanceToStatic(BP_OPTIONAL_INT, "stream",
+                        "java/util/OptionalInt", descriptor); return;
+            }
+        }
+        if ("java/util/OptionalLong".equals(owner)) {
+            if ("ifPresentOrElse".equals(name)) {
+                remapInstanceToStatic(BP_OPTIONAL_LONG, "ifPresentOrElse",
+                        "java/util/OptionalLong", descriptor); return;
+            }
+            if ("stream".equals(name)) {
+                remapInstanceToStatic(BP_OPTIONAL_LONG, "stream",
+                        "java/util/OptionalLong", descriptor); return;
+            }
+        }
+        if ("java/util/OptionalDouble".equals(owner)) {
+            if ("ifPresentOrElse".equals(name)) {
+                remapInstanceToStatic(BP_OPTIONAL_DOUBLE, "ifPresentOrElse",
+                        "java/util/OptionalDouble", descriptor); return;
+            }
+            if ("stream".equals(name)) {
+                remapInstanceToStatic(BP_OPTIONAL_DOUBLE, "stream",
+                        "java/util/OptionalDouble", descriptor); return;
             }
         }
 
@@ -223,6 +315,14 @@ public class MethodDesugarer extends LocalVariablesSorter {
                 remapInstanceToStatic(BP_CF, "copy",
                         "java/util/concurrent/CompletableFuture", descriptor); return;
             }
+        }
+
+        // ── java.lang.Process additions (toHandle) ────────────────────────────
+        if ("java/lang/Process".equals(owner)
+                && "toHandle".equals(name)
+                && "()Ljava/lang/ProcessHandle;".equals(descriptor)) {
+            remapInstanceToStatic(BP_PROCESS_HANDLE, "fromProcess",
+                    "java/lang/Process", descriptor); return;
         }
 
         // No remapping needed – emit unchanged

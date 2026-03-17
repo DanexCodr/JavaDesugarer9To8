@@ -1,6 +1,7 @@
 package desugarer;
 
 import org.objectweb.asm.*;
+import org.objectweb.asm.commons.ClassRemapper;
 
 import java.io.*;
 import java.util.*;
@@ -25,8 +26,11 @@ import java.util.jar.*;
  *    Map.ofEntries, Map.entry, copyOf variants)
  *  - java.util.stream.Stream additions            (takeWhile, dropWhile,
  *    ofNullable, three-argument iterate)
+ *  - java.util.stream.IntStream/LongStream/DoubleStream additions
+ *    (takeWhile, dropWhile, three-argument iterate)
  *  - java.util.stream.Collectors additions        (filtering, flatMapping)
  *  - java.util.Optional additions                 (ifPresentOrElse, or, stream)
+ *  - java.util.OptionalInt/Long/Double additions  (ifPresentOrElse, stream)
  *  - java.io.InputStream additions               (transferTo, readAllBytes,
  *    readNBytes)
  *  - java.util.Objects additions                  (requireNonNullElse,
@@ -34,6 +38,7 @@ import java.util.jar.*;
  *  - java.util.concurrent.CompletableFuture additions  (orTimeout,
  *    completeOnTimeout, failedFuture, completedStage, failedStage,
  *    minimalCompletionStage, newIncompleteFuture, copy)
+ *  - java.lang.ProcessHandle / StackWalker / Flow (rewritten to j9compat types)
  *
  * Usage:
  *   java -cp desugar9to8.jar:asm-9.4.jar:asm-commons-9.4.jar:asm-tree-9.4.jar \
@@ -45,11 +50,27 @@ public class Java9ToJava8Desugarer {
     private static final String[] BACKPORT_CLASSES = {
         "j9compat/CollectionBackport.class",
         "j9compat/StreamBackport.class",
+        "j9compat/IntStreamBackport.class",
+        "j9compat/LongStreamBackport.class",
+        "j9compat/DoubleStreamBackport.class",
         "j9compat/OptionalBackport.class",
+        "j9compat/OptionalIntBackport.class",
+        "j9compat/OptionalLongBackport.class",
+        "j9compat/OptionalDoubleBackport.class",
         "j9compat/IOBackport.class",
         "j9compat/ObjectsBackport.class",
         "j9compat/CompletableFutureBackport.class",
         "j9compat/CollectorsBackport.class",
+        "j9compat/ProcessHandle.class",
+        "j9compat/ProcessHandle$Info.class",
+        "j9compat/Flow.class",
+        "j9compat/Flow$Publisher.class",
+        "j9compat/Flow$Subscriber.class",
+        "j9compat/Flow$Subscription.class",
+        "j9compat/Flow$Processor.class",
+        "j9compat/StackWalker.class",
+        "j9compat/StackWalker$Option.class",
+        "j9compat/StackWalker$StackFrame.class",
     };
 
     // ────────────────────────────────────────────────────────────────────────
@@ -158,7 +179,8 @@ public class Java9ToJava8Desugarer {
             ClassWriter cw = new ClassWriter(cr,
                     ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
 
-            ClassDesugarer cv = new ClassDesugarer(cw, stats);
+            ClassDesugarer cv = new ClassDesugarer(
+                    new ClassRemapper(cw, new BackportRemapper()), stats);
             cr.accept(cv, ClassReader.EXPAND_FRAMES);
 
             stats.classesProcessed++;
