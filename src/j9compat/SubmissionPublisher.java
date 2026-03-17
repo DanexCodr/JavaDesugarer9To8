@@ -19,8 +19,8 @@ import java.util.function.Consumer;
  */
 public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable {
 
-    static final int BUFFER_CAPACITY_LIMIT = 1 << 30;
-    static final int INITIAL_CAPACITY = 256;
+    static final int MAX_BUFFER_CAPACITY = 1 << 30;
+    static final int INITIAL_CAPACITY = 16;
 
     private final CopyOnWriteArrayList<BufferedSubscription<T>> subscribers =
             new CopyOnWriteArrayList<BufferedSubscription<T>>();
@@ -50,10 +50,10 @@ public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable 
 
     static int roundCapacity(int capacity) {
         int rounded = 1;
-        while (rounded < capacity && rounded < BUFFER_CAPACITY_LIMIT) {
+        while (rounded < capacity && rounded < MAX_BUFFER_CAPACITY) {
             rounded <<= 1;
         }
-        return Math.min(rounded, BUFFER_CAPACITY_LIMIT);
+        return Math.min(rounded, MAX_BUFFER_CAPACITY);
     }
 
     @Override

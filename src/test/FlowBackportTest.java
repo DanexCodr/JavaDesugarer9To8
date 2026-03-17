@@ -105,11 +105,11 @@ public final class FlowBackportTest {
         HoldingSubscriber<String> subscriber = new HoldingSubscriber<String>();
 
         publisher.subscribe(subscriber);
-        publisher.offer("first", (sub, item) -> {
+        publisher.offer("first", (target, item) -> {
             drops[0]++;
             return true;
         });
-        publisher.offer("second", (sub, item) -> {
+        publisher.offer("second", (target, item) -> {
             drops[0]++;
             return true;
         });

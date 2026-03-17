@@ -53,8 +53,8 @@ be migrated manually.
 - **`StackWalker` uses stack traces** – Frames are derived from
   `Thread.getStackTrace()` and do not expose hidden frames or bytecode indices.
   `StackFrame.getMethodType()` / `getDescriptor()` are resolved from class files
-  when available, and `StackFrame.getDeclaringClass()` requires
-  `StackWalker.Option.RETAIN_CLASS_REFERENCE`.
+  when available; overloaded methods without debug line info may be unresolved.
+  `StackFrame.getDeclaringClass()` requires `StackWalker.Option.RETAIN_CLASS_REFERENCE`.
 
 ## Version coverage notes
 

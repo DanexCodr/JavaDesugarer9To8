@@ -10,10 +10,10 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -186,8 +186,14 @@ public final class StackWalker {
     }
 
     private static final class MethodDescriptorResolver {
-        private static final Map<String, List<MethodInfo>> CACHE =
-                new ConcurrentHashMap<String, List<MethodInfo>>();
+        private static final int CACHE_LIMIT = 256;
+        private static final Map<String, List<MethodInfo>> CACHE = Collections.synchronizedMap(
+                new LinkedHashMap<String, List<MethodInfo>>(CACHE_LIMIT, 0.75f, true) {
+                    @Override
+                    protected boolean removeEldestEntry(Map.Entry<String, List<MethodInfo>> eldest) {
+                        return size() > CACHE_LIMIT;
+                    }
+                });
 
         private MethodDescriptorResolver() {}
 
