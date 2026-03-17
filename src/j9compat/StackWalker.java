@@ -326,7 +326,7 @@ public final class StackWalker {
                         break;
                     default:
                         throw new IOException("Unknown constant pool tag " + tag + " in "
-                                + className + " (expected supported tags 1,3-12,15-20)");
+                                + className + " (expected supported tags 1,3-12,15,16,18-20)");
                 }
             }
             return utf8;
@@ -420,10 +420,10 @@ public final class StackWalker {
                 if (nameMatch == null) {
                     nameMatch = info;
                 } else {
-                    nameMatch = MethodInfo.MULTIPLE;
+                    nameMatch = MethodInfo.AMBIGUOUS_MATCH;
                 }
             }
-            return nameMatch == MethodInfo.MULTIPLE ? null : nameMatch;
+            return nameMatch == MethodInfo.AMBIGUOUS_MATCH ? null : nameMatch;
         }
 
         private static MethodInfo resolveViaReflection(String className,
@@ -495,7 +495,7 @@ public final class StackWalker {
     }
 
     private static final class MethodInfo {
-        static final MethodInfo MULTIPLE = new MethodInfo("", "", -1, -1);
+        static final MethodInfo AMBIGUOUS_MATCH = new MethodInfo("", "", -1, -1);
         final String name;
         final String descriptor;
         final int minLine;

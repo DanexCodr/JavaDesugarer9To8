@@ -59,7 +59,7 @@ public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable 
     public void subscribe(Flow.Subscriber<? super T> subscriber) {
         Objects.requireNonNull(subscriber, "subscriber");
         if (closed) {
-            subscriber.onSubscribe(EmptySubscription.INSTANCE);
+            subscriber.onSubscribe(NoOpSubscription.INSTANCE);
             Throwable error = closedException;
             if (error != null) {
                 subscriber.onError(error);
@@ -226,8 +226,8 @@ public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable 
         subscriber.onError(error);
     }
 
-    private static final class EmptySubscription implements Flow.Subscription {
-        private static final EmptySubscription INSTANCE = new EmptySubscription();
+    private static final class NoOpSubscription implements Flow.Subscription {
+        private static final NoOpSubscription INSTANCE = new NoOpSubscription();
 
         @Override
         public void request(long n) {
@@ -248,8 +248,8 @@ public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable 
         private volatile boolean draining;
         private volatile Throwable terminalError;
 
-        private BufferedSubscription(Flow.Subscriber<? super T> subscriber,
-                                     SubmissionPublisher<T> publisher) {
+        BufferedSubscription(Flow.Subscriber<? super T> subscriber,
+                             SubmissionPublisher<T> publisher) {
             this.subscriber = subscriber;
             this.publisher = publisher;
         }
