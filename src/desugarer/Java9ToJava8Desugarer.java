@@ -558,11 +558,8 @@ public class Java9ToJava8Desugarer {
             return Collections.emptyList();
         }
         String[] entries = classPath.split(java.util.regex.Pattern.quote(File.pathSeparator));
-        List<File> files = new ArrayList<File>();
+        List<File> files = new ArrayList<>();
         for (String entry : entries) {
-            if (entry == null) {
-                continue;
-            }
             String trimmed = entry.trim();
             if (!trimmed.isEmpty()) {
                 files.add(new File(trimmed));
