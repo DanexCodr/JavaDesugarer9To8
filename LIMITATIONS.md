@@ -10,6 +10,6 @@ Internal bounds:
 
 - `StackWalker` method-descriptor caching defaults to 256 entries. Set the
   `j9compat.stackwalker.cache.size` system property to a positive integer to
-  adjust the cache size.
+  adjust the cache size (capped at 65,536 entries).
 - `SubmissionPublisher` rounds buffer capacities up to a power of two and caps
   the value at `1 << 30` (matching the JDK behavior).

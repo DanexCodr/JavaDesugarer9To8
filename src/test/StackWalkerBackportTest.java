@@ -34,11 +34,29 @@ public final class StackWalkerBackportTest {
         System.setProperty(property, "4");
         try {
             Class<?> resolver = Class.forName("j9compat.StackWalker$MethodDescriptorResolver");
-            java.lang.reflect.Field field = resolver.getDeclaredField("CACHE_LIMIT");
-            field.setAccessible(true);
-            int value = field.getInt(null);
-            assertEquals(4, value,
+            java.lang.reflect.Field cacheLimitField = resolver.getDeclaredField("CACHE_LIMIT");
+            cacheLimitField.setAccessible(true);
+            int cacheLimit = cacheLimitField.getInt(null);
+            assertEquals(4, cacheLimit,
                     "StackWalker descriptor cache limit: honors system property");
+
+            java.lang.reflect.Method resolveMethod = resolver.getDeclaredMethod("resolveCacheLimit");
+            resolveMethod.setAccessible(true);
+
+            System.setProperty(property, "0");
+            int zeroValue = (Integer) resolveMethod.invoke(null);
+            assertEquals(256, zeroValue,
+                    "StackWalker descriptor cache limit: zero defaults to 256");
+
+            System.setProperty(property, "not-a-number");
+            int invalidValue = (Integer) resolveMethod.invoke(null);
+            assertEquals(256, invalidValue,
+                    "StackWalker descriptor cache limit: invalid value defaults to 256");
+
+            System.setProperty(property, "1000000");
+            int cappedValue = (Integer) resolveMethod.invoke(null);
+            assertEquals(65536, cappedValue,
+                    "StackWalker descriptor cache limit: caps large values");
         } catch (ReflectiveOperationException | SecurityException e) {
             fail("StackWalker descriptor cache limit: reflection failed (" + e.getClass().getSimpleName() + ")");
         } finally {

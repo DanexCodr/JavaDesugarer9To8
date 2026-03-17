@@ -187,6 +187,8 @@ public final class StackWalker {
 
     private static final class MethodDescriptorResolver {
         private static final String CACHE_LIMIT_PROPERTY = "j9compat.stackwalker.cache.size";
+        private static final int DEFAULT_CACHE_LIMIT = 256;
+        private static final int MAX_CACHE_LIMIT = 65536;
         private static final int CACHE_LIMIT = resolveCacheLimit();
         private static final int CLASS_FILE_MAGIC = 0xCAFEBABE;
         private static final Map<String, List<MethodInfo>> CACHE = Collections.synchronizedMap(
@@ -202,13 +204,16 @@ public final class StackWalker {
         private static int resolveCacheLimit() {
             String value = System.getProperty(CACHE_LIMIT_PROPERTY);
             if (value == null || value.trim().isEmpty()) {
-                return 256;
+                return DEFAULT_CACHE_LIMIT;
             }
             try {
                 int parsed = Integer.parseInt(value.trim());
-                return parsed > 0 ? parsed : 256;
+                if (parsed <= 0) {
+                    return DEFAULT_CACHE_LIMIT;
+                }
+                return Math.min(parsed, MAX_CACHE_LIMIT);
             } catch (NumberFormatException ignored) {
-                return 256;
+                return DEFAULT_CACHE_LIMIT;
             }
         }
 
