@@ -162,6 +162,7 @@ public class Java9ToJava8Desugarer {
         try (JarFile jarFile = new JarFile(input);
              JarOutputStream jos = new JarOutputStream(
                      new BufferedOutputStream(new FileOutputStream(output)))) {
+            ClassHierarchy hierarchy = buildHierarchy(jarFile);
 
             // 1. Transform all entries from the input JAR
             Enumeration<JarEntry> entries = jarFile.entries();
@@ -196,7 +197,7 @@ public class Java9ToJava8Desugarer {
                     }
 
                     if (name.endsWith(".class")) {
-                        ClassTransformResult result = desugarClass(bytes, name, stats);
+                        ClassTransformResult result = desugarClass(bytes, name, stats, hierarchy);
                         bytes = result.bytes;
                     } else {
                         stats.otherEntries++;
@@ -237,16 +238,44 @@ public class Java9ToJava8Desugarer {
     //  Class transformation
     // ────────────────────────────────────────────────────────────────────────
 
+    private static ClassHierarchy buildHierarchy(JarFile jarFile) throws IOException {
+        ClassHierarchy hierarchy = new ClassHierarchy();
+        Enumeration<JarEntry> entries = jarFile.entries();
+        while (entries.hasMoreElements()) {
+            JarEntry entry = entries.nextElement();
+            String name = entry.getName();
+            if (!name.endsWith(".class")) {
+                continue;
+            }
+            try (InputStream is = jarFile.getInputStream(entry)) {
+                byte[] bytes = readAllBytes(is);
+                ClassReader cr = new ClassReader(bytes);
+                cr.accept(new ClassVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visit(int version, int access, String className,
+                                      String signature, String superName,
+                                      String[] interfaces) {
+                        if (!"module-info".equals(className)) {
+                            hierarchy.record(className, superName, interfaces);
+                        }
+                    }
+                }, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+            }
+        }
+        return hierarchy;
+    }
+
     public static ClassTransformResult desugarClass(byte[] classBytes,
                                                      String name,
-                                                     Stats stats) {
+                                                     Stats stats,
+                                                     ClassHierarchy hierarchy) {
         try {
             ClassReader cr = new ClassReader(classBytes);
-            ClassWriter cw = new ClassWriter(cr,
+            ClassWriter cw = new SafeClassWriter(cr,
                     ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
 
             ClassDesugarer cv = new ClassDesugarer(
-                    new ClassRemapper(cw, new BackportRemapper()), stats);
+                    new ClassRemapper(cw, new BackportRemapper()), stats, hierarchy);
             cr.accept(cv, ClassReader.EXPAND_FRAMES);
 
             stats.classesProcessed++;
@@ -293,6 +322,21 @@ public class Java9ToJava8Desugarer {
     // ────────────────────────────────────────────────────────────────────────
     //  Helpers
     // ────────────────────────────────────────────────────────────────────────
+
+    private static final class SafeClassWriter extends ClassWriter {
+        SafeClassWriter(ClassReader classReader, int flags) {
+            super(classReader, flags);
+        }
+
+        @Override
+        protected String getCommonSuperClass(String type1, String type2) {
+            try {
+                return super.getCommonSuperClass(type1, type2);
+            } catch (RuntimeException ignored) {
+                return "java/lang/Object";
+            }
+        }
+    }
 
     static void writeEntry(JarOutputStream jos, String name,
                             byte[] bytes, Set<String> written) throws IOException {

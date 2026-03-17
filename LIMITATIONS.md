@@ -25,26 +25,28 @@ be migrated manually.
 - **String concatenation performance** – `invokedynamic` string concatenation
   is rewritten to `StringBuilder` bytecode. The output is functionally correct
   but does not use `StringConcatFactory` optimizations.
-- **InputStream remapping is signature-based** – Any virtual call named
-  `transferTo`, `readAllBytes`, or `readNBytes` with the JDK signatures will be
-  rewritten, even if the receiver type is not actually an `InputStream`. This
-  is rare but can mis-remap custom APIs with identical method signatures.
+- **InputStream remapping is type-aware** – Calls are rewritten only when the
+  receiver class can be resolved as `InputStream` or a subclass (from the input
+  JAR or the runtime classpath). If a dependency class cannot be resolved, the
+  call is left unchanged and may need the dependency on the classpath or manual
+  migration.
 - **Private interface methods become package-private** – Java 8 rejects private
   interface methods, so the desugarer strips `ACC_PRIVATE`. This makes those
   methods package-private, which can allow same-package access and changes
   reflection visibility.
-- **Classes that fail desugaring remain Java 9+ class files** – If ASM cannot transform a
-  class (for example, due to missing dependencies needed to compute frames),
-  the original class bytes are kept. The output JAR may still contain Java 9
-  class files in that case.
+- **Some classes may still skip desugaring on hard ASM failures** – Missing
+  dependencies no longer prevent frame computation (the writer falls back to
+  `java/lang/Object`), but corrupted bytecode or unsupported constructs can
+  still force a fallback to the original class bytes.
 
 ## Backport behavior notes
 
-- **`ProcessHandle` is scoped to the current process and known child processes** –
-  `ProcessHandle.current()` and `Process.toHandle()` are supported, but
-  `parent()`, `children()`, and `descendants()` return empty results. The
-  `info()` payload only includes best-effort values (command line, start time,
-  and user where available).
+- **`ProcessHandle` is scoped to the current process and spawned child processes** –
+  `ProcessHandle.current()` and `Process.toHandle()` are supported, and
+  `parent()`, `children()`, and `descendants()` are populated for processes
+  created via `Process.toHandle()`/`ProcessHandle.fromProcess()`. The `info()`
+  payload only includes best-effort values (command line, start time, and user
+  where available).
 - **Android runtime metadata is best-effort** – When `java.lang.management`
   classes are unavailable (Android 11–15), `ProcessHandle` falls back to
   reflective checks and may report unknown PIDs or missing start times.

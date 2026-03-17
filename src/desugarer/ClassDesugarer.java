@@ -20,11 +20,14 @@ public class ClassDesugarer extends ClassVisitor {
     private static final int JAVA_8_VERSION = Opcodes.V1_8; // 52
 
     private final Java9ToJava8Desugarer.Stats stats;
+    private final ClassHierarchy hierarchy;
     private boolean isInterface;
 
-    public ClassDesugarer(ClassVisitor cv, Java9ToJava8Desugarer.Stats stats) {
+    public ClassDesugarer(ClassVisitor cv, Java9ToJava8Desugarer.Stats stats,
+                          ClassHierarchy hierarchy) {
         super(Opcodes.ASM9, cv);
         this.stats = stats;
+        this.hierarchy = hierarchy;
     }
 
     // ── Class header ────────────────────────────────────────────────────────
@@ -67,6 +70,6 @@ public class ClassDesugarer extends ClassVisitor {
                 signature, exceptions);
         if (mv == null) return null;
 
-        return new MethodDesugarer(access, descriptor, mv, stats);
+        return new MethodDesugarer(access, descriptor, mv, stats, hierarchy);
     }
 }

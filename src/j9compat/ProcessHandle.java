@@ -1,6 +1,10 @@
 package j9compat;
 
 import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -67,7 +71,7 @@ final class ProcessHandleImpl implements ProcessHandle {
 
     private static final ConcurrentMap<Long, ProcessHandleImpl> HANDLES =
             new ConcurrentHashMap<Long, ProcessHandleImpl>();
-    private static final ProcessHandleImpl CURRENT = new ProcessHandleImpl(currentPid(), null, true);
+    private static final ProcessHandleImpl CURRENT = new ProcessHandleImpl(currentPid(), null, true, null);
     private static volatile CompletableFuture<ProcessHandle> CURRENT_EXIT;
 
     static {
@@ -79,12 +83,14 @@ final class ProcessHandleImpl implements ProcessHandle {
     private final long pid;
     private final Process process;
     private final boolean current;
+    private final ProcessHandleImpl parent;
     private final Info info;
 
-    private ProcessHandleImpl(long pid, Process process, boolean current) {
+    private ProcessHandleImpl(long pid, Process process, boolean current, ProcessHandleImpl parent) {
         this.pid = pid;
         this.process = process;
         this.current = current;
+        this.parent = parent;
         this.info = new InfoImpl(process, current);
     }
 
@@ -112,7 +118,8 @@ final class ProcessHandleImpl implements ProcessHandle {
             throw new NullPointerException("process");
         }
         long pid = processPid(process);
-        ProcessHandleImpl handle = new ProcessHandleImpl(pid, process, false);
+        ProcessHandleImpl handle = new ProcessHandleImpl(pid, process, false,
+                CURRENT.pid > 0 ? CURRENT : null);
         if (pid > 0) {
             HANDLES.put(pid, handle);
         }
@@ -126,17 +133,37 @@ final class ProcessHandleImpl implements ProcessHandle {
 
     @Override
     public Optional<ProcessHandle> parent() {
-        return Optional.empty();
+        return Optional.<ProcessHandle>ofNullable(parent);
     }
 
     @Override
     public Stream<ProcessHandle> children() {
-        return Stream.empty();
+        if (pid <= 0) {
+            return Stream.empty();
+        }
+        return HANDLES.values().stream()
+                .filter(handle -> handle.parent != null && handle.parent.pid == pid)
+                .map(handle -> (ProcessHandle) handle);
     }
 
     @Override
     public Stream<ProcessHandle> descendants() {
-        return Stream.empty();
+        if (pid <= 0) {
+            return Stream.empty();
+        }
+        List<ProcessHandle> handles = new ArrayList<>();
+        Deque<ProcessHandleImpl> stack = new ArrayDeque<>();
+        HANDLES.values().stream()
+                .filter(handle -> handle.parent != null && handle.parent.pid == pid)
+                .forEach(stack::push);
+        while (!stack.isEmpty()) {
+            ProcessHandleImpl handle = stack.pop();
+            handles.add(handle);
+            HANDLES.values().stream()
+                    .filter(child -> child.parent != null && child.parent.pid == handle.pid)
+                    .forEach(stack::push);
+        }
+        return handles.stream();
     }
 
     @Override

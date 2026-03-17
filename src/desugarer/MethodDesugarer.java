@@ -70,11 +70,14 @@ public class MethodDesugarer extends LocalVariablesSorter {
     private static final String BP_PROCESS_HANDLE = "j9compat/ProcessHandle";
 
     private final Java9ToJava8Desugarer.Stats stats;
+    private final ClassHierarchy hierarchy;
 
     public MethodDesugarer(int access, String descriptor, MethodVisitor mv,
-                           Java9ToJava8Desugarer.Stats stats) {
+                           Java9ToJava8Desugarer.Stats stats,
+                           ClassHierarchy hierarchy) {
         super(Opcodes.ASM9, access, descriptor, mv);
         this.stats = stats;
+        this.hierarchy = hierarchy;
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -249,20 +252,22 @@ public class MethodDesugarer extends LocalVariablesSorter {
         }
 
         // ── java.io.InputStream additions ────────────────────────────────────
-        if ("transferTo".equals(name)
-                && "(Ljava/io/OutputStream;)J".equals(descriptor)) {
-            remapInstanceToStatic(BP_IO, "transferTo",
-                    "java/io/InputStream", descriptor); return;
-        }
-        if ("readAllBytes".equals(name)
-                && "()[B".equals(descriptor)) {
-            remapInstanceToStatic(BP_IO, "readAllBytes",
-                    "java/io/InputStream", descriptor); return;
-        }
-        if ("readNBytes".equals(name)
-                && ("([BII)I".equals(descriptor) || "(I)[B".equals(descriptor))) {
-            remapInstanceToStatic(BP_IO, "readNBytes",
-                    "java/io/InputStream", descriptor); return;
+        if (isInputStreamOwner(owner)) {
+            if ("transferTo".equals(name)
+                    && "(Ljava/io/OutputStream;)J".equals(descriptor)) {
+                remapInstanceToStatic(BP_IO, "transferTo",
+                        "java/io/InputStream", descriptor); return;
+            }
+            if ("readAllBytes".equals(name)
+                    && "()[B".equals(descriptor)) {
+                remapInstanceToStatic(BP_IO, "readAllBytes",
+                        "java/io/InputStream", descriptor); return;
+            }
+            if ("readNBytes".equals(name)
+                    && ("([BII)I".equals(descriptor) || "(I)[B".equals(descriptor))) {
+                remapInstanceToStatic(BP_IO, "readNBytes",
+                        "java/io/InputStream", descriptor); return;
+            }
         }
 
         // ── java.util.Objects additions (Java 9) ─────────────────────────────
@@ -387,6 +392,13 @@ public class MethodDesugarer extends LocalVariablesSorter {
     static String prependReceiver(String receiverInternalName, String descriptor) {
         // descriptor starts with '('
         return "(L" + receiverInternalName + ";" + descriptor.substring(1);
+    }
+
+    private boolean isInputStreamOwner(String owner) {
+        if (hierarchy == null) {
+            return true;
+        }
+        return hierarchy.isInputStreamOwner(owner);
     }
 
     // ────────────────────────────────────────────────────────────────────────
