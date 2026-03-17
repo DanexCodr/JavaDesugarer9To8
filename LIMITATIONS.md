@@ -24,6 +24,18 @@
   `transferTo`, `readAllBytes`, or `readNBytes` with the JDK signatures will be
   rewritten, even if the receiver type is not actually an `InputStream`. This
   is rare but can mis-remap custom APIs with identical method signatures.
+- **Private interface methods become package-private** – Java 8 rejects private
+  interface methods, so the desugarer strips `ACC_PRIVATE`. This makes those
+  methods package-private, which can allow same-package access and changes
+  reflection visibility.
+- **Classes that fail desugaring stay Java 9** – If ASM cannot transform a
+  class (for example, due to missing dependencies needed to compute frames),
+  the original class bytes are kept. The output JAR may still contain Java 9
+  class files in that case.
+- **Reflection/MethodHandle lookups are not remapped** – The desugarer only
+  rewrites direct bytecode method invocations. Reflective or `MethodHandles`
+  lookups of Java 9 APIs will still resolve the original methods and need
+  manual migration.
 
 ## Version coverage notes
 
