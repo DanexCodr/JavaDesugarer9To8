@@ -47,6 +47,8 @@ public final class StackWalkerBackportTest {
             int zeroValue = (Integer) resolveMethod.invoke(null);
             assertEquals(256, zeroValue,
                     "StackWalker descriptor cache limit: zero defaults to 256");
+            assertEquals(4, cacheLimitField.getInt(null),
+                    "StackWalker descriptor cache limit: initialized once");
 
             System.setProperty(property, "not-a-number");
             int invalidValue = (Integer) resolveMethod.invoke(null);

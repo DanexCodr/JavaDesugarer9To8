@@ -203,11 +203,15 @@ public final class StackWalker {
 
         private static int resolveCacheLimit() {
             String value = System.getProperty(CACHE_LIMIT_PROPERTY);
-            if (value == null || value.trim().isEmpty()) {
+            if (value == null) {
+                return DEFAULT_CACHE_LIMIT;
+            }
+            String trimmed = value.trim();
+            if (trimmed.isEmpty()) {
                 return DEFAULT_CACHE_LIMIT;
             }
             try {
-                int parsed = Integer.parseInt(value.trim());
+                int parsed = Integer.parseInt(trimmed);
                 if (parsed <= 0) {
                     return DEFAULT_CACHE_LIMIT;
                 }
