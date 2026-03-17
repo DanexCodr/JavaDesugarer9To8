@@ -61,13 +61,7 @@ public final class ProcessHandleBackportTest {
         } catch (Exception e) {
             fail("ProcessHandle child tracking threw exception: " + e.getMessage());
         } finally {
-            if (process != null) {
-                try {
-                    process.waitFor();
-                } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+            waitForProcess(process);
         }
     }
 
@@ -81,13 +75,7 @@ public final class ProcessHandleBackportTest {
         } catch (Exception e) {
             fail("ProcessHandle.onExit threw exception: " + e.getMessage());
         } finally {
-            if (process != null) {
-                try {
-                    process.waitFor();
-                } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+            waitForProcess(process);
         }
     }
 
@@ -98,5 +86,16 @@ public final class ProcessHandleBackportTest {
         return new ProcessBuilder(javaBin, "-cp", classpath, "test.SleepyProcess")
                 .redirectErrorStream(true)
                 .start();
+    }
+
+    private static void waitForProcess(Process process) {
+        if (process == null) {
+            return;
+        }
+        try {
+            process.waitFor();
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

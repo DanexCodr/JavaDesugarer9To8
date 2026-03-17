@@ -1,7 +1,6 @@
 package desugarer;
 
 import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -74,7 +73,7 @@ final class ClassHierarchy {
 
         private ClassInfo(String superName, String[] interfaces) {
             this.superName = superName;
-            this.interfaces = interfaces == null ? new String[0] : Arrays.copyOf(interfaces, interfaces.length);
+            this.interfaces = interfaces != null ? interfaces : new String[0];
         }
     }
 }
