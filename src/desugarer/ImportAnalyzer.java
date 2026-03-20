@@ -9,8 +9,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class ImportAnalyzer {
-    private static final Pattern PACKAGE_PATTERN = Pattern.compile("^\\s*package\\s+([\\w.]+)\\s*;", Pattern.MULTILINE);
-    private static final Pattern IMPORT_PATTERN = Pattern.compile("^\\s*import\\s+(static\\s+)?([\\w.*]+)\\s*;", Pattern.MULTILINE);
+    private static final String IDENT = "[\\p{L}\\p{N}_$]+";
+    private static final String QUALIFIED = IDENT + "(?:\\." + IDENT + ")*";
+    private static final Pattern PACKAGE_PATTERN = Pattern.compile(
+            "^\\s*package\\s+(" + QUALIFIED + ")\\s*;", Pattern.MULTILINE);
+    private static final Pattern IMPORT_PATTERN = Pattern.compile(
+            "^\\s*import\\s+(static\\s+)?(" + QUALIFIED + "(?:\\.\\*)?)\\s*;", Pattern.MULTILINE);
 
     private final Map<String, String> explicitImports = new HashMap<>();
     private final Set<String> wildcardImports = new HashSet<>();

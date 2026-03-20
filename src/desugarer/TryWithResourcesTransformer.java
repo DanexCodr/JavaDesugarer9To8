@@ -82,7 +82,7 @@ public final class TryWithResourcesTransformer implements SourceTransformer {
                 start = i + 1;
             }
         }
-        if (start <= resources.length()) {
+        if (start < resources.length()) {
             String tail = resources.substring(start);
             if (!tail.trim().isEmpty()) {
                 parts.add(tail);

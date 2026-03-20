@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class Java9SourceDesugarer {
+    // Temurin is the Adoptium distribution name used for runtime validation.
     private static final String TEMURIN_TOKEN = "temurin";
     private static final String ADOPTIUM_TOKEN = "adoptium";
 

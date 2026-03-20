@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 public final class PrivateInterfaceMethodTransformer implements SourceTransformer {
     private static final Pattern INTERFACE_PATTERN = Pattern.compile("\\binterface\\b");
-    private static final String SELF_PARAM = "__j9_interface_self";
+    private static final String INTERFACE_SELF_PARAM_NAME = "__j9_interface_self";
 
     @Override
     public String transform(String source, SourceContext context) {
@@ -489,7 +489,7 @@ public final class PrivateInterfaceMethodTransformer implements SourceTransforme
 
             String newParams = params.trim();
             if (needsSelf) {
-                String selfParam = interfaceName + " " + SELF_PARAM;
+                String selfParam = interfaceName + " " + INTERFACE_SELF_PARAM_NAME;
                 newParams = newParams.isEmpty() ? selfParam : selfParam + ", " + newParams;
             }
 
@@ -500,10 +500,10 @@ public final class PrivateInterfaceMethodTransformer implements SourceTransforme
             int localBodyStart = bounds.bodyStart - bounds.startIndex;
             String body = methodText.substring(localBodyStart);
             if (needsSelf) {
-                body = replaceThisOutsideNestedTypes(body, SELF_PARAM);
+                body = replaceThisOutsideNestedTypes(body, INTERFACE_SELF_PARAM_NAME);
             }
             body = new PrivateInterfaceMethodTransformer().rewritePrivateCalls(
-                    body, methods, helperName, needsSelf ? SELF_PARAM : null);
+                    body, methods, helperName, needsSelf ? INTERFACE_SELF_PARAM_NAME : null);
             return body;
         }
     }
