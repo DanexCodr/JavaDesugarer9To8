@@ -156,6 +156,67 @@ java -jar build/desugar9to8.jar --incremental --cache-dir build/.desugar-cache \
   build/backport
 ```
 
+### Real-world verification (reflection-java9)
+
+The `com.nerdvision:reflection-java9:3.0.2` artifact is compiled for Java 9
+(class version 53) and calls `Class.getModule()`. The steps below desugar it
+and run a Java 8 smoke test.
+
+```bash
+# Download the Java 9 jar and its Java 8 dependencies
+curl -L -o /tmp/reflection-java9-3.0.2.jar \
+  https://repo1.maven.org/maven2/com/nerdvision/reflection-java9/3.0.2/reflection-java9-3.0.2.jar
+curl -L -o /tmp/reflection-api-3.0.2.jar \
+  https://repo1.maven.org/maven2/com/nerdvision/reflection-api/3.0.2/reflection-api-3.0.2.jar
+curl -L -o /tmp/agent-api-3.0.2.jar \
+  https://repo1.maven.org/maven2/com/nerdvision/agent-api/3.0.2/agent-api-3.0.2.jar
+
+# Desugar the Java 9 jar
+java -jar build/desugar9to8.jar \
+  /tmp/reflection-java9-3.0.2.jar \
+  /tmp/reflection-java9-3.0.2-java8.jar \
+  build/backport
+
+# Verify class version is now Java 8 (major 52)
+javap -verbose -classpath /tmp/reflection-java9-3.0.2-java8.jar \
+  com.nerdvision.agent.reflect.java9.Java9ReflectionImpl | grep "major version"
+
+# Use any Java 8 runtime (download Temurin 8 if needed)
+curl -L -o /tmp/temurin8-jre.tar.gz \
+  https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u482-b08/OpenJDK8U-jre_x64_linux_hotspot_8u482b08.tar.gz
+tar -xzf /tmp/temurin8-jre.tar.gz -C /tmp
+
+cat > /tmp/Java9ReflectionSmokeTest.java << 'JAVA'
+public class Java9ReflectionSmokeTest {
+    private static class Dummy {
+        private String secret = "ok";
+    }
+
+    public static void main(String[] args) throws Exception {
+        com.nerdvision.agent.reflect.java9.Java9ReflectionImpl impl =
+            new com.nerdvision.agent.reflect.java9.Java9ReflectionImpl();
+        java.lang.reflect.Field field = Dummy.class.getDeclaredField("secret");
+        boolean result = impl.setAccessible(Dummy.class, field);
+        System.out.println("setAccessible=" + result);
+        System.out.println("value=" + field.get(new Dummy()));
+    }
+}
+JAVA
+
+javac --release 8 \
+  -cp /tmp/reflection-java9-3.0.2-java8.jar:/tmp/reflection-api-3.0.2.jar:/tmp/agent-api-3.0.2.jar \
+  -d /tmp/java9-smoke-test \
+  /tmp/Java9ReflectionSmokeTest.java
+
+/tmp/jdk8u482-b08-jre/bin/java \
+  -cp /tmp/reflection-java9-3.0.2-java8.jar:/tmp/reflection-api-3.0.2.jar:/tmp/agent-api-3.0.2.jar:/tmp/java9-smoke-test \
+  Java9ReflectionSmokeTest
+
+# Expected output:
+# setAccessible=true
+# value=ok
+```
+
 ---
 
 ## Java 9 features covered
