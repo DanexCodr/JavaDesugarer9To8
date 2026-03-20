@@ -45,6 +45,7 @@ fully **Java 8-compatible** JAR, including a bundled runtime backport library
 │   ├── desugarer/
 │   │   ├── Java9ToJava8Desugarer.java  Main tool – processes JARs
 │   │   ├── ClassDesugarer.java         ClassVisitor (version + interface priv)
+│   │   ├── ClassHierarchy.java         Tracks class inheritance/implements
 │   │   └── MethodDesugarer.java        MethodVisitor (API call remapping)
 │   │
 │   └── j9compat/                       Runtime backport library (Java 8)
@@ -119,6 +120,7 @@ javac -source 8 -target 8 \
   -d build/desugarer \
   src/desugarer/Java9ToJava8Desugarer.java \
   src/desugarer/ClassDesugarer.java \
+  src/desugarer/ClassHierarchy.java \
   src/desugarer/MethodDesugarer.java \
   src/desugarer/BackportRemapper.java
 
