@@ -47,7 +47,11 @@ jobs:
           javac -source 8 -target 8 \
             -cp asm-9.4.jar:asm-commons-9.4.jar:asm-tree-9.4.jar \
             -d build/desugarer \
-            src/desugarer/*.java
+            src/desugarer/Java9ToJava8Desugarer.java \
+            src/desugarer/ClassDesugarer.java \
+            src/desugarer/ClassHierarchy.java \
+            src/desugarer/MethodDesugarer.java \
+            src/desugarer/BackportRemapper.java
 
       # Package everything into a single fat JAR
       - name: Package desugarer fat JAR

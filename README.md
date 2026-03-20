@@ -45,6 +45,7 @@ fully **Java 8-compatible** JAR, including a bundled runtime backport library
 │   ├── desugarer/
 │   │   ├── Java9ToJava8Desugarer.java  Main tool – processes JARs
 │   │   ├── ClassDesugarer.java         ClassVisitor (version + interface priv)
+│   │   ├── ClassHierarchy.java         Tracks class inheritance/implements
 │   │   └── MethodDesugarer.java        MethodVisitor (API call remapping)
 │   │
 │   └── j9compat/                       Runtime backport library (Java 8)
@@ -87,11 +88,11 @@ mkdir -p build/desugarer
 javac -source 8 -target 8 \
   -cp asm-9.4.jar:asm-commons-9.4.jar:asm-tree-9.4.jar \
   -d build/desugarer \
-  src/desugarer/*.java
-
-> Note: If your shell does not expand `*` globs (e.g., some Windows setups),
-> replace `src/j9compat/*.java` and `src/desugarer/*.java` with an explicit
-> file list or a shell-specific file expansion command.
+  src/desugarer/Java9ToJava8Desugarer.java \
+  src/desugarer/ClassDesugarer.java \
+  src/desugarer/ClassHierarchy.java \
+  src/desugarer/MethodDesugarer.java \
+  src/desugarer/BackportRemapper.java
 
 # 3. Build a fat JAR (ASM + desugarer classes in one JAR)
 mkdir -p build/fatjar
