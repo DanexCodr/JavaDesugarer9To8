@@ -64,6 +64,7 @@ jobs:
             -d build/desugarer \
             src/desugarer/Java9ToJava8Desugarer.java \
             src/desugarer/ClassDesugarer.java \
+            src/desugarer/ClassHierarchy.java \
             src/desugarer/MethodDesugarer.java \
             src/desugarer/BackportRemapper.java
 
