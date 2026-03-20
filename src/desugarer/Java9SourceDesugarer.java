@@ -10,6 +10,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class Java9SourceDesugarer {
+    private static final String TEMURIN_TOKEN = "temurin";
+    private static final String ADOPTIUM_TOKEN = "adoptium";
+
     private Java9SourceDesugarer() {}
 
     public static void main(String[] args) throws Exception {
@@ -23,7 +26,7 @@ public final class Java9SourceDesugarer {
             return;
         }
 
-        Java9ToJava8Desugarer.requireTemurinRuntime();
+        requireTemurinRuntime();
 
         File input = new File(options.sourcePath);
         if (!input.isFile()) {
@@ -78,6 +81,21 @@ public final class Java9SourceDesugarer {
         if (exit != 0) {
             System.err.println("javac failed with exit code " + exit);
             System.exit(exit);
+        }
+    }
+
+    private static void requireTemurinRuntime() {
+        String vendor = System.getProperty("java.vendor", "");
+        String runtime = System.getProperty("java.runtime.name", "");
+        String vmVendor = System.getProperty("java.vm.vendor", "");
+        String vmName = System.getProperty("java.vm.name", "");
+        String combined = (vendor + " " + runtime + " " + vmVendor + " " + vmName)
+                .toLowerCase(java.util.Locale.ROOT);
+        if (!combined.contains(TEMURIN_TOKEN) && !combined.contains(ADOPTIUM_TOKEN)) {
+            System.err.println("Unsupported Java runtime detected.");
+            System.err.println("This tool is supported only on Eclipse Temurin (Adoptium).");
+            System.err.println("Detected: " + vendor + " / " + runtime + " / " + vmVendor);
+            System.exit(1);
         }
     }
 

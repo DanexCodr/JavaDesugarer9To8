@@ -604,7 +604,7 @@ public class Java9ToJava8Desugarer {
         return files;
     }
 
-    static void requireTemurinRuntime() {
+    private static void requireTemurinRuntime() {
         String vendor = System.getProperty("java.vendor", "");
         String runtime = System.getProperty("java.runtime.name", "");
         String vmVendor = System.getProperty("java.vm.vendor", "");

@@ -82,6 +82,10 @@ javac -source 8 -target 8 \
   -d build/backport \
   src/j9compat/*.java
 
+> Note: If your shell does not expand `*` globs (e.g., some Windows setups),
+> replace `src/j9compat/*.java` and `src/desugarer/*.java` with an explicit
+> file list or a shell-specific file expansion command.
+
 # 2. Compile the desugarer tool
 mkdir -p build/desugarer
 javac -source 8 -target 8 \
