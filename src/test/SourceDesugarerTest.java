@@ -41,7 +41,7 @@ public final class SourceDesugarerTest {
         String output = new SourceDesugarer().desugar(input, "Calculator.java", false);
         BackportTestRunner.assertTrue(output.contains("class CalculatorHelper"),
                 "Helper class inserted");
-        BackportTestRunner.assertTrue(output.contains("static int add(Calculator __j9_interface_self, int a, int b)"),
+        BackportTestRunner.assertTrue(output.contains("static int add(Calculator __desugar_j9_interface_self__, int a, int b)"),
                 "Private method moved to helper with self param");
         BackportTestRunner.assertTrue(output.contains("CalculatorHelper.add(this, sum, a)"),
                 "Private method call rewritten");
@@ -74,7 +74,7 @@ public final class SourceDesugarerTest {
                 + "}\n";
 
         String output = new SourceDesugarer().desugar(input, "Example.java", false);
-        BackportTestRunner.assertTrue(output.contains("try (AutoCloseable __j9r0 = r1; AutoCloseable __j9r1 = r2)"),
+        BackportTestRunner.assertTrue(output.contains("try (AutoCloseable __desugar_resource_0 = r1; AutoCloseable __desugar_resource_1 = r2)"),
                 "Try-with-resources rewritten with AutoCloseable variables");
     }
 

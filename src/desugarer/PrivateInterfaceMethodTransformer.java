@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 public final class PrivateInterfaceMethodTransformer implements SourceTransformer {
     private static final Pattern INTERFACE_PATTERN = Pattern.compile("\\binterface\\b");
-    private static final String INTERFACE_SELF_PARAM_NAME = "__j9_interface_self";
+    private static final String INTERFACE_SELF_PARAM_NAME = "__desugar_j9_interface_self__";
 
     @Override
     public String transform(String source, SourceContext context) {

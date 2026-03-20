@@ -11,8 +11,8 @@ import java.util.List;
 
 public final class Java9SourceDesugarer {
     // Temurin is the Adoptium distribution name used for runtime validation.
-    private static final String TEMURIN_TOKEN = "temurin";
-    private static final String ADOPTIUM_TOKEN = "adoptium";
+    private static final String TEMURIN_VENDOR_IDENTIFIER = "temurin";
+    private static final String ADOPTIUM_VENDOR_IDENTIFIER = "adoptium";
 
     private Java9SourceDesugarer() {}
 
@@ -92,7 +92,8 @@ public final class Java9SourceDesugarer {
         String vmName = System.getProperty("java.vm.name", "");
         String combined = (vendor + " " + runtime + " " + vmVendor + " " + vmName)
                 .toLowerCase(java.util.Locale.ROOT);
-        if (!combined.contains(TEMURIN_TOKEN) && !combined.contains(ADOPTIUM_TOKEN)) {
+        if (!combined.contains(TEMURIN_VENDOR_IDENTIFIER)
+                && !combined.contains(ADOPTIUM_VENDOR_IDENTIFIER)) {
             System.err.println("Unsupported Java runtime detected.");
             System.err.println("This tool is supported only on Eclipse Temurin (Adoptium).");
             System.err.println("Detected: " + vendor + " / " + runtime + " / " + vmVendor);

@@ -61,7 +61,7 @@ public final class TryWithResourcesTransformer implements SourceTransformer {
             if (counter > 0) {
                 rewritten.append("; ");
             }
-            rewritten.append("AutoCloseable __j9r").append(counter++)
+            rewritten.append("AutoCloseable __desugar_resource_").append(counter++)
                     .append(" = ").append(name);
         }
         return rewritten.toString();
