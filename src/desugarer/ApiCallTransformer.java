@@ -192,9 +192,9 @@ public final class ApiCallTransformer implements SourceTransformer {
 
         updated = replaceInstanceNoArgs(updated, "getModule", MODULE_BACKPORT, "getModule", context);
 
-        if (imports.isTypeImported("MethodHandles", "java.lang.invoke.MethodHandles")
-                || code.contains("java.lang.invoke.MethodHandles")
-                || code.contains("MethodHandles")) {
+        boolean hasMethodHandles = imports.isTypeImported("MethodHandles", "java.lang.invoke.MethodHandles")
+                || code.contains("MethodHandles");
+        if (hasMethodHandles) {
             updated = replaceInstanceInsertReceiver(updated, "findVarHandle", METHOD_HANDLES_BACKPORT,
                     "findVarHandle", context);
             updated = replaceInstanceInsertReceiver(updated, "findStaticVarHandle", METHOD_HANDLES_BACKPORT,
