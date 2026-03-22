@@ -1,11 +1,16 @@
 # Limitations
 
-There are no known functional limitations in Java 9–11 API coverage. All Java
-9–11 APIs referenced in desugared bytecode (including module system and VarHandle
-usage) are remapped to Java 8-compatible `j9compat` backports, and
+All Java 9–11 APIs referenced in desugared bytecode (including module system and
+VarHandle usage) are remapped to Java 8-compatible `j9compat` backports, and
 reflective/MethodHandle lookups are redirected to those backports. Java 12+
 APIs are not yet desugared; those can be added in future sessions. The backport
 test suite exercises every remapped API and currently passes.
+
+Known gaps:
+
+- The HTTP client backport uses `HttpURLConnection` under the hood and only
+  supports HTTP/1.1-style request/response handling. HTTP/2 features such as
+  server push (push promise handlers) are ignored.
 
 Internal bounds:
 

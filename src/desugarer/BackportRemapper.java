@@ -45,6 +45,21 @@ public final class BackportRemapper extends Remapper {
         TYPE_MAP.put("java/lang/module/ResolvedModule", "j9compat/ResolvedModule");
         TYPE_MAP.put("java/lang/invoke/VarHandle", "j9compat/VarHandle");
         TYPE_MAP.put("java/lang/invoke/VarHandle$AccessMode", "j9compat/VarHandle$AccessMode");
+        TYPE_MAP.put("java/net/http/HttpClient", "j9compat/HttpClient");
+        TYPE_MAP.put("java/net/http/HttpClient$Builder", "j9compat/HttpClient$Builder");
+        TYPE_MAP.put("java/net/http/HttpClient$Redirect", "j9compat/HttpClient$Redirect");
+        TYPE_MAP.put("java/net/http/HttpClient$Version", "j9compat/HttpClient$Version");
+        TYPE_MAP.put("java/net/http/HttpHeaders", "j9compat/HttpHeaders");
+        TYPE_MAP.put("java/net/http/HttpRequest", "j9compat/HttpRequest");
+        TYPE_MAP.put("java/net/http/HttpRequest$BodyPublisher", "j9compat/HttpRequest$BodyPublisher");
+        TYPE_MAP.put("java/net/http/HttpRequest$BodyPublishers", "j9compat/HttpRequest$BodyPublishers");
+        TYPE_MAP.put("java/net/http/HttpRequest$Builder", "j9compat/HttpRequest$Builder");
+        TYPE_MAP.put("java/net/http/HttpResponse", "j9compat/HttpResponse");
+        TYPE_MAP.put("java/net/http/HttpResponse$BodyHandler", "j9compat/HttpResponse$BodyHandler");
+        TYPE_MAP.put("java/net/http/HttpResponse$BodyHandlers", "j9compat/HttpResponse$BodyHandlers");
+        TYPE_MAP.put("java/net/http/HttpResponse$BodySubscriber", "j9compat/HttpResponse$BodySubscriber");
+        TYPE_MAP.put("java/net/http/HttpResponse$ResponseInfo", "j9compat/HttpResponse$ResponseInfo");
+        TYPE_MAP.put("java/net/http/HttpResponse$PushPromiseHandler", "j9compat/HttpResponse$PushPromiseHandler");
     }
 
     @Override

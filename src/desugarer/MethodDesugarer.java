@@ -63,6 +63,7 @@ import java.util.List;
  *   <li>{@code Files.readString}, {@code Files.writeString} (Java 11)</li>
  *   <li>{@code Path.of} (Java 11)</li>
  *   <li>{@code Predicate.not} (Java 11)</li>
+ *   <li>{@code HttpClient}, {@code HttpRequest}, {@code HttpResponse}, {@code HttpHeaders} (Java 11)</li>
  * </ul>
  */
 public class MethodDesugarer extends LocalVariablesSorter {
