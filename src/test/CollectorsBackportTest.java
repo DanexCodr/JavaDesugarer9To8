@@ -20,6 +20,15 @@ public final class CollectorsBackportTest {
 
         section("CollectorsBackport – flatMapping");
         testFlatMapping();
+
+        section("CollectorsBackport – toUnmodifiableList");
+        testToUnmodifiableList();
+
+        section("CollectorsBackport – toUnmodifiableSet");
+        testToUnmodifiableSet();
+
+        section("CollectorsBackport – toUnmodifiableMap");
+        testToUnmodifiableMap();
     }
 
     static void testFiltering() {
@@ -63,5 +72,60 @@ public final class CollectorsBackportTest {
                 () -> Stream.of("x")
                         .collect(CollectorsBackport.flatMapping(s -> null, Collectors.toList())),
                 "flatMapping(null stream): throws NPE");
+    }
+
+    static void testToUnmodifiableList() {
+        List<String> list = Stream.of("a", "b")
+                .collect(CollectorsBackport.toUnmodifiableList());
+        assertEquals(Arrays.asList("a", "b"), list, "toUnmodifiableList: collects values");
+        assertThrows(UnsupportedOperationException.class,
+                () -> list.add("c"),
+                "toUnmodifiableList: list is unmodifiable");
+        assertThrows(NullPointerException.class,
+                () -> Stream.of("a", null).collect(CollectorsBackport.toUnmodifiableList()),
+                "toUnmodifiableList: null elements throw NPE");
+    }
+
+    static void testToUnmodifiableSet() {
+        java.util.Set<String> set = Stream.of("a", "b", "a")
+                .collect(CollectorsBackport.toUnmodifiableSet());
+        assertTrue(set.contains("a") && set.contains("b"),
+                "toUnmodifiableSet: collects values");
+        assertThrows(UnsupportedOperationException.class,
+                () -> set.add("c"),
+                "toUnmodifiableSet: set is unmodifiable");
+        assertThrows(NullPointerException.class,
+                () -> Stream.of("a", null).collect(CollectorsBackport.toUnmodifiableSet()),
+                "toUnmodifiableSet: null elements throw NPE");
+    }
+
+    static void testToUnmodifiableMap() {
+        java.util.Map<String, Integer> map = Stream.of("a", "bb")
+                .collect(CollectorsBackport.toUnmodifiableMap(s -> s, String::length));
+        assertEquals(1, map.get("a"), "toUnmodifiableMap: maps key/value");
+        assertEquals(2, map.get("bb"), "toUnmodifiableMap: maps key/value");
+        assertThrows(UnsupportedOperationException.class,
+                () -> map.put("c", 3),
+                "toUnmodifiableMap: map is unmodifiable");
+
+        assertThrows(IllegalStateException.class,
+                () -> Stream.of("a", "a")
+                        .collect(CollectorsBackport.toUnmodifiableMap(s -> s, String::length)),
+                "toUnmodifiableMap: duplicate keys throw");
+        assertThrows(NullPointerException.class,
+                () -> Stream.of("a", null)
+                        .collect(CollectorsBackport.toUnmodifiableMap(s -> s, String::length)),
+                "toUnmodifiableMap: null values throw NPE");
+
+        java.util.Map<String, Integer> merged = Stream.of("a", "aa")
+                .collect(CollectorsBackport.toUnmodifiableMap(
+                        s -> "key", String::length, (l, r) -> l + r));
+        assertEquals(3, merged.get("key"), "toUnmodifiableMap merge: combines values");
+
+        assertThrows(NullPointerException.class,
+                () -> Stream.of("a", "aa")
+                        .collect(CollectorsBackport.toUnmodifiableMap(
+                                s -> "key", String::length, (l, r) -> null)),
+                "toUnmodifiableMap merge: null merge result throws NPE");
     }
 }

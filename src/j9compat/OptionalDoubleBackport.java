@@ -1,5 +1,6 @@
 package j9compat;
 
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.OptionalDouble;
 import java.util.function.DoubleConsumer;
@@ -32,5 +33,13 @@ public final class OptionalDoubleBackport {
         return optional.isPresent()
                 ? DoubleStream.of(optional.getAsDouble())
                 : DoubleStream.empty();
+    }
+
+    public static double orElseThrow(OptionalDouble optional) {
+        Objects.requireNonNull(optional, "optional");
+        if (optional.isPresent()) {
+            return optional.getAsDouble();
+        }
+        throw new NoSuchElementException("No value present");
     }
 }

@@ -1,5 +1,6 @@
 package j9compat;
 
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.function.LongConsumer;
@@ -32,5 +33,13 @@ public final class OptionalLongBackport {
         return optional.isPresent()
                 ? LongStream.of(optional.getAsLong())
                 : LongStream.empty();
+    }
+
+    public static long orElseThrow(OptionalLong optional) {
+        Objects.requireNonNull(optional, "optional");
+        if (optional.isPresent()) {
+            return optional.getAsLong();
+        }
+        throw new NoSuchElementException("No value present");
     }
 }

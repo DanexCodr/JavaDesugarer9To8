@@ -17,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Added a `--class-path` option so the desugarer can resolve `InputStream`
   subclasses from dependency jars/directories when remapping Java 9 stream IO
   calls.
+- Added Java 10 API coverage for `Collectors.toUnmodifiable*` and
+  `Optional.orElseThrow()` backports.
+- Added a framework-style `MethodTransform` extension hook for custom remapping
+  rules.
 
 ---
 

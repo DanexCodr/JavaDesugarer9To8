@@ -53,6 +53,8 @@ import java.util.List;
  *   <li>{@code MethodHandles.Lookup.findVarHandle},
  *       {@code MethodHandles.Lookup.findStaticVarHandle},
  *       {@code MethodHandles.arrayElementVarHandle}</li>
+ *   <li>{@code Collectors.toUnmodifiableList/Set/Map} (Java 10)</li>
+ *   <li>{@code Optional.orElseThrow()} (Java 10)</li>
  * </ul>
  */
 public class MethodDesugarer extends LocalVariablesSorter {
@@ -75,6 +77,8 @@ public class MethodDesugarer extends LocalVariablesSorter {
     private static final String BP_MODULE_BACKPORT = "j9compat/ModuleBackport";
     private static final String BP_REFLECTION = "j9compat/ReflectionBackport";
     private static final String BP_METHOD_HANDLES = "j9compat/MethodHandlesBackport";
+    private static final List<MethodTransform> EXTRA_TRANSFORMS =
+            MethodTransformRegistry.load();
 
     private final Java9ToJava8Desugarer.Stats stats;
     private final ClassHierarchy hierarchy;
@@ -92,6 +96,11 @@ public class MethodDesugarer extends LocalVariablesSorter {
     @Override
     public void visitMethodInsn(int opcode, String owner, String name,
                                  String descriptor, boolean isInterface) {
+        for (MethodTransform transform : EXTRA_TRANSFORMS) {
+            if (transform.transform(this, opcode, owner, name, descriptor, isInterface)) {
+                return;
+            }
+        }
 
         // ── java.util.List factory methods ──────────────────────────────────
         if ("java/util/List".equals(owner)) {
@@ -430,7 +439,7 @@ public class MethodDesugarer extends LocalVariablesSorter {
      * Emits an INVOKESTATIC to the given backport class with the *same*
      * descriptor (used for static-interface-method replacements).
      */
-    private void remap(String newOwner, String newName, String descriptor) {
+    void remap(String newOwner, String newName, String descriptor) {
         System.out.println("  [REMAP]  static  " + newOwner + "." + newName + descriptor);
         stats.apiCallsRemapped++;
         super.visitMethodInsn(Opcodes.INVOKESTATIC, newOwner, newName,
@@ -447,8 +456,8 @@ public class MethodDesugarer extends LocalVariablesSorter {
      * the regular arguments, the stack state is correct without inserting any
      * extra instructions.
      */
-    private void remapInstanceToStatic(String newOwner, String newName,
-                                        String receiverOwner, String descriptor) {
+    void remapInstanceToStatic(String newOwner, String newName,
+                               String receiverOwner, String descriptor) {
         String newDescriptor = prependReceiver(receiverOwner, descriptor);
         System.out.println("  [REMAP]  instance→static  "
                 + newOwner + "." + newName + newDescriptor);

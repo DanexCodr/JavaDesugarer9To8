@@ -8,10 +8,10 @@ import java.util.*;
 import java.util.jar.*;
 
 /**
- * Java 9 → Java 8 Desugarer
+ * Java 9–10 → Java 8 Desugarer
  *
- * Processes a JAR compiled with Java 9 (class version 53) and produces a
- * Java 8-compatible JAR (class version 52) by:
+ * Processes a JAR compiled with Java 9–10 (class version 53–54) and produces
+ * a Java 8-compatible JAR (class version 52) by:
  *
  *  1. Downgrading the class-file version from 53 (Java 9) to 52 (Java 8).
  *  2. Downgrading module-info.class entries so they remain present as metadata
@@ -28,9 +28,12 @@ import java.util.jar.*;
  *    ofNullable, three-argument iterate)
  *  - java.util.stream.IntStream/LongStream/DoubleStream additions
  *    (takeWhile, dropWhile, three-argument iterate)
- *  - java.util.stream.Collectors additions        (filtering, flatMapping)
- *  - java.util.Optional additions                 (ifPresentOrElse, or, stream)
- *  - java.util.OptionalInt/Long/Double additions  (ifPresentOrElse, stream)
+ *  - java.util.stream.Collectors additions        (filtering, flatMapping,
+ *    toUnmodifiableList/Set/Map)
+ *  - java.util.Optional additions                 (ifPresentOrElse, or, stream,
+ *    orElseThrow)
+ *  - java.util.OptionalInt/Long/Double additions  (ifPresentOrElse, stream,
+ *    orElseThrow)
  *  - java.io.InputStream additions               (transferTo, readAllBytes,
  *    readNBytes)
  *  - java.util.Objects additions                  (requireNonNullElse,
@@ -144,7 +147,7 @@ public class Java9ToJava8Desugarer {
             System.exit(1);
         }
 
-        System.out.println("=== Java 9 → Java 8 Desugarer ===");
+        System.out.println("=== Java 9–10 → Java 8 Desugarer ===");
         System.out.println("Input  : " + inputFile.getAbsolutePath());
         System.out.println("Output : " + new File(outputPath).getAbsolutePath());
         System.out.println("Mode   : " + (options.incremental ? "incremental" : "full"));
@@ -578,7 +581,7 @@ public class Java9ToJava8Desugarer {
         System.err.println(
             "   or: java -jar desugar9to8.jar --source <file> [--output <file>] [--compile] [--class-path <path>] [--dry-run] [--verbose]");
         System.err.println();
-        System.err.println("  <input.jar>            Java 9-compiled JAR to desugar");
+        System.err.println("  <input.jar>            Java 9/10-compiled JAR to desugar");
         System.err.println("  <output.jar>           Java 8-compatible output JAR");
         System.err.println("  [backport-classes-dir] Optional directory that contains compiled");
         System.err.println("                         j9compat/*.class backport files to bundle");

@@ -1,19 +1,19 @@
-# Java 9+ → Java 8 Desugarer
+# Java 9–10 → Java 8 Desugarer
 
-A bytecode-level tool that transforms a JAR compiled with **Java 9+** into a
+A bytecode-level tool that transforms a JAR compiled with **Java 9–10** into a
 fully **Java 8-compatible** JAR, including a bundled runtime backport library
-(`j9compat`) that provides Java 8 implementations of every Java 9+ API used.
+(`j9compat`) that provides Java 8 implementations of every Java 9–10 API used.
 
 **Compatibility focus:** runs on **Eclipse Temurin (Adoptium)** and targets
-**Android 11–15 (API 30–34)** deployments with Java 9+ bytecode input.
+**Android 11–15 (API 30–34)** deployments with Java 9–10 bytecode input.
 
 ## What this repository provides
 
-- **Desugarer CLI**: rewrites Java 9+ bytecode to Java 8 bytecode and optionally
+- **Desugarer CLI**: rewrites Java 9–10 bytecode to Java 8 bytecode and optionally
   bundles the backport classes into the output JAR.
-- **`j9compat` backport library**: Java 8 implementations of Java 9+ APIs that
+- **`j9compat` backport library**: Java 8 implementations of Java 9–10 APIs that
   your desugared code calls at runtime.
-- **Source desugaring mode**: converts Java 9+ source files to Java 8-compatible
+- **Source desugaring mode**: converts Java 9–10 source files to Java 8-compatible
   source (with an optional compile step).
 - **Incremental processing**: cache-based mode to speed up repeated desugaring
   runs for large JARs.
@@ -26,16 +26,16 @@ fully **Java 8-compatible** JAR, including a bundled runtime backport library
 
 | Transformation | Description |
 |----------------|-------------|
-| **Class-file version downgrade** | Changes class file major version from 53 and above (Java 9+) to 52 (Java 8). |
+| **Class-file version downgrade** | Changes class file major version from 53–54 (Java 9–10) to 52 (Java 8). |
 | **Module-info retention** | Downgrades `module-info.class` so module metadata is preserved even though Java 8 ignores JPMS. |
 | **Private interface methods** | Java 9+ allows `private` methods in interfaces. This tool makes them package-private so the Java 8 verifier accepts them. |
 | **String concatenation** | Rewrites `invokedynamic` StringConcatFactory concatenation to `StringBuilder` bytecode. |
 | **Collection factory methods** | Redirects `List.of()`, `Set.of()`, `Map.of()`, `Map.ofEntries()`, `Map.entry()`, and all `copyOf()` variants to `j9compat.CollectionBackport`. |
 | **Stream API additions** | Redirects `takeWhile()`, `dropWhile()`, `ofNullable()`, and the three-argument `iterate()` to `j9compat.StreamBackport`. |
 | **Primitive Stream additions** | Redirects `IntStream/LongStream/DoubleStream.takeWhile()`, `dropWhile()`, and the three-argument `iterate()` to `j9compat.*StreamBackport`. |
-| **Collectors additions** | Redirects `Collectors.filtering()` and `Collectors.flatMapping()` to `j9compat.CollectorsBackport`. |
-| **Optional API additions** | Redirects `ifPresentOrElse()`, `or()`, and `stream()` to `j9compat.OptionalBackport`. |
-| **Optional primitive additions** | Redirects `OptionalInt/Long/Double.ifPresentOrElse()` and `.stream()` to `j9compat.Optional*Backport`. |
+| **Collectors additions** | Redirects `Collectors.filtering()`, `Collectors.flatMapping()`, and `Collectors.toUnmodifiable*()` to `j9compat.CollectorsBackport`. |
+| **Optional API additions** | Redirects `ifPresentOrElse()`, `or()`, `stream()`, and `orElseThrow()` to `j9compat.OptionalBackport`. |
+| **Optional primitive additions** | Redirects `OptionalInt/Long/Double.ifPresentOrElse()`, `.stream()`, and `.orElseThrow()` to `j9compat.Optional*Backport`. |
 | **InputStream additions** | Redirects `transferTo()`, `readAllBytes()`, and `readNBytes()` to `j9compat.IOBackport`. |
 | **Objects additions** | Redirects `requireNonNullElse()`, `requireNonNullElseGet()`, `checkIndex()`, `checkFromToIndex()`, and `checkFromIndexSize()` to `j9compat.ObjectsBackport`. |
 | **CompletableFuture additions** | Redirects `orTimeout()`, `completeOnTimeout()`, `failedFuture()`, `completedStage()`, `failedStage()`, `minimalCompletionStage()`, `newIncompleteFuture()`, and `copy()` to `j9compat.CompletableFutureBackport`. |
@@ -119,12 +119,12 @@ jar cfe build/desugar9to8.jar desugarer.Java9ToJava8Desugarer -C build/fatjar .
 ## Usage
 
 ```
-java -jar build/desugar9to8.jar [--incremental] [--cache-dir <dir>] [--class-path <path>] <input-java9.jar> <output-java8.jar> [backport-classes-dir]
+java -jar build/desugar9to8.jar [--incremental] [--cache-dir <dir>] [--class-path <path>] <input-java9-10.jar> <output-java8.jar> [backport-classes-dir]
 ```
 
 | Argument | Description |
 |----------|-------------|
-| `<input-java9.jar>` | JAR compiled with Java 9 (class version 53). |
+| `<input-java9-10.jar>` | JAR compiled with Java 9 or 10 (class version 53–54). |
 | `<output-java8.jar>` | Path for the Java 8-compatible output JAR. |
 | `[backport-classes-dir]` | Optional: directory containing compiled `j9compat/*.class` files. If provided, the backport classes are bundled into the output JAR. |
 | `--incremental` | Enable incremental mode (reuse unchanged output entries). |
@@ -135,11 +135,11 @@ java -jar build/desugar9to8.jar [--incremental] [--cache-dir <dir>] [--class-pat
 
 ```bash
 java -jar build/desugar9to8.jar \
-  my-app-java9.jar \
+  my-app-java10.jar \
   my-app-java8.jar \
   build/backport
 
-### Source desugaring (Java 9 → Java 8 source)
+### Source desugaring (Java 9–10 → Java 8 source)
 
 ```
 java -jar build/desugar9to8.jar --source MyApp.java --output MyApp.java8.java
@@ -155,7 +155,23 @@ java -jar build/desugar9to8.jar --source MyApp.java --compile
 The output JAR will:
 - Have all class files at version 52 (Java 8).
 - Contain the `j9compat.*` backport classes.
-- Redirect every Java 9 API call to the corresponding backport method.
+- Redirect every Java 9–10 API call to the corresponding backport method.
+
+### Framework-style extensions
+
+The desugarer exposes a lightweight framework hook via `desugarer.MethodTransform`.
+Custom transformers can be registered with Java’s `ServiceLoader` mechanism to
+add or override method remapping rules without changing the core tool. Place a
+`META-INF/services/desugarer.MethodTransform` file on the classpath and list
+your implementation class names to have them loaded automatically.
+
+Example invocation with a plugin JAR:
+
+```bash
+java -cp build/desugar9to8.jar:my-desugar-plugin.jar \
+  desugarer.Java9ToJava8Desugarer \
+  my-app-java10.jar my-app-java8.jar build/backport
+```
 
 ### Incremental mode
 
@@ -232,7 +248,7 @@ javac --release 8 \
 
 ---
 
-## Java 9 features covered
+## Java 9–10 features covered
 
 ### Collection factory methods
 All Java 9 immutable-collection factory methods are replaced with Java 8
@@ -267,6 +283,9 @@ DoubleStream.iterate(s, h, f)  --> DoubleStreamBackport.iterate(s, h, f)
 ```java
 Collectors.filtering(p, c)     --> CollectorsBackport.filtering(p, c)
 Collectors.flatMapping(f, c)   --> CollectorsBackport.flatMapping(f, c)
+Collectors.toUnmodifiableList()--> CollectorsBackport.toUnmodifiableList()
+Collectors.toUnmodifiableSet() --> CollectorsBackport.toUnmodifiableSet()
+Collectors.toUnmodifiableMap(k,v) --> CollectorsBackport.toUnmodifiableMap(k, v)
 ```
 
 ### Optional API
@@ -274,6 +293,7 @@ Collectors.flatMapping(f, c)   --> CollectorsBackport.flatMapping(f, c)
 opt.ifPresentOrElse(a, e)      --> OptionalBackport.ifPresentOrElse(opt, a, e)
 opt.or(supplier)               --> OptionalBackport.or(opt, supplier)
 opt.stream()                   --> OptionalBackport.stream(opt)
+opt.orElseThrow()              --> OptionalBackport.orElseThrow(opt)
 ```
 
 ### Optional primitive API
@@ -281,6 +301,7 @@ opt.stream()                   --> OptionalBackport.stream(opt)
 optInt.ifPresentOrElse(a, e)   --> OptionalIntBackport.ifPresentOrElse(optInt, a, e)
 optLong.stream()               --> OptionalLongBackport.stream(optLong)
 optDouble.stream()             --> OptionalDoubleBackport.stream(optDouble)
+optInt.orElseThrow()           --> OptionalIntBackport.orElseThrow(optInt)
 ```
 
 ### InputStream API
@@ -357,7 +378,7 @@ The desugarer is built on **ASM 9.4** (ObjectWeb ASM bytecode library).
 2. **`ClassDesugarer`** (a `ClassVisitor`) downgrades the class-file version and
    strips `ACC_PRIVATE` from interface methods.
 3. **`MethodDesugarer`** (a `MethodVisitor`) intercepts every
-   `visitMethodInsn()` call and rewrites matching Java 9 API calls:
+   `visitMethodInsn()` call and rewrites matching Java 9–10 API calls:
    - *Static-to-static*: same descriptor, new owner/name, `isInterface=false`.
    - *Instance-to-static*: the receiver is prepended to the descriptor, and
      `INVOKEVIRTUAL`/`INVOKEINTERFACE` becomes `INVOKESTATIC`. The operand
@@ -386,6 +407,6 @@ desugar any JAR attached to the latest release.
 
 ## Limitations
 
-There are currently no known limitations; all Java 9 API call sites listed
-above are redirected to the `j9compat` backports. For status details, see
+Java 9–10 API call sites listed above are redirected to the `j9compat` backports.
+Java 11+ APIs are not yet desugared. For status details, see
 [LIMITATIONS.md](LIMITATIONS.md).

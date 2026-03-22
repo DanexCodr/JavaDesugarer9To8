@@ -46,6 +46,12 @@ public final class OptionalPrimitiveBackportTest {
         assertEquals(3, sum, "OptionalInt.stream: single element stream");
         assertEquals(0, OptionalIntBackport.stream(OptionalInt.empty()).sum(),
                 "OptionalInt.stream: empty stream");
+
+        assertEquals(9, OptionalIntBackport.orElseThrow(OptionalInt.of(9)),
+                "OptionalInt.orElseThrow: returns value when present");
+        assertThrows(java.util.NoSuchElementException.class,
+                () -> OptionalIntBackport.orElseThrow(OptionalInt.empty()),
+                "OptionalInt.orElseThrow: empty optional throws");
     }
 
     private static void testOptionalLong() {
@@ -68,6 +74,12 @@ public final class OptionalPrimitiveBackportTest {
         assertEquals(4L, sum, "OptionalLong.stream: single element stream");
         assertEquals(0L, OptionalLongBackport.stream(OptionalLong.empty()).sum(),
                 "OptionalLong.stream: empty stream");
+
+        assertEquals(11L, OptionalLongBackport.orElseThrow(OptionalLong.of(11L)),
+                "OptionalLong.orElseThrow: returns value when present");
+        assertThrows(java.util.NoSuchElementException.class,
+                () -> OptionalLongBackport.orElseThrow(OptionalLong.empty()),
+                "OptionalLong.orElseThrow: empty optional throws");
     }
 
     private static void testOptionalDouble() {
@@ -90,5 +102,11 @@ public final class OptionalPrimitiveBackportTest {
         assertEquals(1.5, sum, "OptionalDouble.stream: single element stream");
         assertEquals(0.0, OptionalDoubleBackport.stream(OptionalDouble.empty()).sum(),
                 "OptionalDouble.stream: empty stream");
+
+        assertEquals(7.5, OptionalDoubleBackport.orElseThrow(OptionalDouble.of(7.5)),
+                "OptionalDouble.orElseThrow: returns value when present");
+        assertThrows(java.util.NoSuchElementException.class,
+                () -> OptionalDoubleBackport.orElseThrow(OptionalDouble.empty()),
+                "OptionalDouble.orElseThrow: empty optional throws");
     }
 }

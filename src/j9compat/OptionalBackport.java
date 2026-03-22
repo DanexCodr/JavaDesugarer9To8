@@ -1,6 +1,7 @@
 package j9compat;
 
 import java.util.Objects;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -19,6 +20,8 @@ import java.util.stream.Stream;
  *       present; otherwise returns the optional produced by {@code supplier}.</li>
  *   <li>{@code Optional.stream()} – returns a one-element stream if a value is
  *       present, otherwise an empty stream.</li>
+ *   <li>{@code Optional.orElseThrow()} – returns the value or throws
+ *       {@link NoSuchElementException} if empty.</li>
  * </ul>
  *
  * <p>Because these are instance methods on {@code Optional}, the desugarer
@@ -80,5 +83,16 @@ public final class OptionalBackport {
     public static <T> Stream<T> stream(Optional<T> optional) {
         Objects.requireNonNull(optional, "optional");
         return optional.isPresent() ? Stream.of(optional.get()) : Stream.empty();
+    }
+
+    /**
+     * Backport of {@code Optional.orElseThrow()} (Java 10).
+     */
+    public static <T> T orElseThrow(Optional<T> optional) {
+        Objects.requireNonNull(optional, "optional");
+        if (optional.isPresent()) {
+            return optional.get();
+        }
+        throw new NoSuchElementException("No value present");
     }
 }

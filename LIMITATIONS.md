@@ -1,9 +1,10 @@
 # Limitations
 
-There are no known functional limitations in Java 9 API coverage. All Java 9
-APIs referenced in desugared bytecode (including module system and VarHandle
+There are no known functional limitations in Java 9–10 API coverage. All Java
+9–10 APIs referenced in desugared bytecode (including module system and VarHandle
 usage) are remapped to Java 8-compatible `j9compat` backports, and
-reflective/MethodHandle lookups are redirected to those backports. The backport
+reflective/MethodHandle lookups are redirected to those backports. Java 11+
+APIs are not yet desugared; those can be added in future sessions. The backport
 test suite exercises every remapped API and currently passes.
 
 Internal bounds:

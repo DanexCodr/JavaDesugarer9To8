@@ -1,5 +1,6 @@
 package j9compat;
 
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.function.IntConsumer;
@@ -32,5 +33,13 @@ public final class OptionalIntBackport {
         return optional.isPresent()
                 ? IntStream.of(optional.getAsInt())
                 : IntStream.empty();
+    }
+
+    public static int orElseThrow(OptionalInt optional) {
+        Objects.requireNonNull(optional, "optional");
+        if (optional.isPresent()) {
+            return optional.getAsInt();
+        }
+        throw new NoSuchElementException("No value present");
     }
 }

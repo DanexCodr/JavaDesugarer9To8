@@ -129,6 +129,18 @@ final class BackportMappings {
                     return BackportMethod.staticMethod(CollectorsBackport.class,
                             "flatMapping", params);
                 }
+                if ("toUnmodifiableList".equals(name)) {
+                    return BackportMethod.staticMethod(CollectorsBackport.class,
+                            "toUnmodifiableList", params);
+                }
+                if ("toUnmodifiableSet".equals(name)) {
+                    return BackportMethod.staticMethod(CollectorsBackport.class,
+                            "toUnmodifiableSet", params);
+                }
+                if ("toUnmodifiableMap".equals(name)) {
+                    return BackportMethod.staticMethod(CollectorsBackport.class,
+                            "toUnmodifiableMap", params);
+                }
             }
             if (owner == Optional.class) {
                 if ("ifPresentOrElse".equals(name)) {
@@ -143,6 +155,10 @@ final class BackportMappings {
                     return BackportMethod.instanceToStatic(OptionalBackport.class,
                             "stream", Optional.class, params);
                 }
+                if ("orElseThrow".equals(name) && params.length == 0) {
+                    return BackportMethod.instanceToStatic(OptionalBackport.class,
+                            "orElseThrow", Optional.class, params);
+                }
             }
             if (owner == OptionalInt.class) {
                 if ("ifPresentOrElse".equals(name)) {
@@ -152,6 +168,10 @@ final class BackportMappings {
                 if ("stream".equals(name)) {
                     return BackportMethod.instanceToStatic(OptionalIntBackport.class,
                             "stream", OptionalInt.class, params);
+                }
+                if ("orElseThrow".equals(name) && params.length == 0) {
+                    return BackportMethod.instanceToStatic(OptionalIntBackport.class,
+                            "orElseThrow", OptionalInt.class, params);
                 }
             }
             if (owner == OptionalLong.class) {
@@ -163,6 +183,10 @@ final class BackportMappings {
                     return BackportMethod.instanceToStatic(OptionalLongBackport.class,
                             "stream", OptionalLong.class, params);
                 }
+                if ("orElseThrow".equals(name) && params.length == 0) {
+                    return BackportMethod.instanceToStatic(OptionalLongBackport.class,
+                            "orElseThrow", OptionalLong.class, params);
+                }
             }
             if (owner == OptionalDouble.class) {
                 if ("ifPresentOrElse".equals(name)) {
@@ -172,6 +196,10 @@ final class BackportMappings {
                 if ("stream".equals(name)) {
                     return BackportMethod.instanceToStatic(OptionalDoubleBackport.class,
                             "stream", OptionalDouble.class, params);
+                }
+                if ("orElseThrow".equals(name) && params.length == 0) {
+                    return BackportMethod.instanceToStatic(OptionalDoubleBackport.class,
+                            "orElseThrow", OptionalDouble.class, params);
                 }
             }
             if (isInputStreamOwner(owner)) {

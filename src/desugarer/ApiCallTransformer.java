@@ -80,6 +80,12 @@ public final class ApiCallTransformer implements SourceTransformer {
                 "java.util.stream.Collectors", "Collectors", "filtering", COLLECTORS_BACKPORT, "filtering");
         updated = replaceStatic(updated, imports, context,
                 "java.util.stream.Collectors", "Collectors", "flatMapping", COLLECTORS_BACKPORT, "flatMapping");
+        updated = replaceStatic(updated, imports, context,
+                "java.util.stream.Collectors", "Collectors", "toUnmodifiableList", COLLECTORS_BACKPORT, "toUnmodifiableList");
+        updated = replaceStatic(updated, imports, context,
+                "java.util.stream.Collectors", "Collectors", "toUnmodifiableSet", COLLECTORS_BACKPORT, "toUnmodifiableSet");
+        updated = replaceStatic(updated, imports, context,
+                "java.util.stream.Collectors", "Collectors", "toUnmodifiableMap", COLLECTORS_BACKPORT, "toUnmodifiableMap");
 
         if (imports.isTypeImported("Stream", "java.util.stream.Stream")
                 || imports.isTypeImported("IntStream", "java.util.stream.IntStream")
@@ -116,24 +122,28 @@ public final class ApiCallTransformer implements SourceTransformer {
             updated = replaceInstance(updated, "ifPresentOrElse", OPTIONAL_BACKPORT, "ifPresentOrElse", context);
             updated = replaceInstance(updated, "or", OPTIONAL_BACKPORT, "or", context);
             updated = replaceInstance(updated, "stream", OPTIONAL_BACKPORT, "stream", context);
+            updated = replaceInstanceNoArgs(updated, "orElseThrow", OPTIONAL_BACKPORT, "orElseThrow", context);
         }
 
         if (imports.isTypeImported("OptionalInt", "java.util.OptionalInt")
                 || code.contains("java.util.OptionalInt")) {
             updated = replaceInstance(updated, "ifPresentOrElse", OPTIONAL_INT_BACKPORT, "ifPresentOrElse", context);
             updated = replaceInstance(updated, "stream", OPTIONAL_INT_BACKPORT, "stream", context);
+            updated = replaceInstanceNoArgs(updated, "orElseThrow", OPTIONAL_INT_BACKPORT, "orElseThrow", context);
         }
 
         if (imports.isTypeImported("OptionalLong", "java.util.OptionalLong")
                 || code.contains("java.util.OptionalLong")) {
             updated = replaceInstance(updated, "ifPresentOrElse", OPTIONAL_LONG_BACKPORT, "ifPresentOrElse", context);
             updated = replaceInstance(updated, "stream", OPTIONAL_LONG_BACKPORT, "stream", context);
+            updated = replaceInstanceNoArgs(updated, "orElseThrow", OPTIONAL_LONG_BACKPORT, "orElseThrow", context);
         }
 
         if (imports.isTypeImported("OptionalDouble", "java.util.OptionalDouble")
                 || code.contains("java.util.OptionalDouble")) {
             updated = replaceInstance(updated, "ifPresentOrElse", OPTIONAL_DOUBLE_BACKPORT, "ifPresentOrElse", context);
             updated = replaceInstance(updated, "stream", OPTIONAL_DOUBLE_BACKPORT, "stream", context);
+            updated = replaceInstanceNoArgs(updated, "orElseThrow", OPTIONAL_DOUBLE_BACKPORT, "orElseThrow", context);
         }
 
         if (imports.isTypeImported("InputStream", "java.io.InputStream")
@@ -244,6 +254,16 @@ public final class ApiCallTransformer implements SourceTransformer {
         return updated;
     }
 
+    private String replaceInstanceNoArgs(String code, String method,
+                                         String replacementClass, String replacementMethod,
+                                         SourceContext context) {
+        String updated = rewriteInstanceCallsNoArgs(code, method, replacementClass, replacementMethod);
+        if (!updated.equals(code)) {
+            context.addImport(replacementClass);
+        }
+        return updated;
+    }
+
     private String rewriteInstanceCalls(String code, String method,
                                         String replacementClass, String replacementMethod) {
         StringBuilder out = new StringBuilder(code.length());
@@ -289,6 +309,56 @@ public final class ApiCallTransformer implements SourceTransformer {
                 out.append(args);
             }
             out.append(')');
+            index = closeParen + 1;
+        }
+        return out.toString();
+    }
+
+    private String rewriteInstanceCallsNoArgs(String code, String method,
+                                              String replacementClass, String replacementMethod) {
+        StringBuilder out = new StringBuilder(code.length());
+        int index = 0;
+        while (index < code.length()) {
+            int dotIndex = findDotMethod(code, method, index);
+            if (dotIndex < 0) {
+                out.append(code.substring(index));
+                break;
+            }
+            int receiverEnd = dotIndex;
+            int receiverStart = findReceiverStart(code, receiverEnd - 1);
+            if (receiverStart < 0) {
+                out.append(code.substring(index, dotIndex + 1));
+                index = dotIndex + 1;
+                continue;
+            }
+            int methodStart = skipWhitespace(code, dotIndex + 1);
+            int parenIndex = skipWhitespace(code, methodStart + method.length());
+            if (parenIndex >= code.length() || code.charAt(parenIndex) != '(') {
+                out.append(code.substring(index, dotIndex + 1));
+                index = dotIndex + 1;
+                continue;
+            }
+            int closeParen = findMatchingParen(code, parenIndex);
+            if (closeParen < 0) {
+                out.append(code.substring(index));
+                break;
+            }
+
+            String receiver = code.substring(receiverStart, receiverEnd).trim();
+            String args = code.substring(parenIndex + 1, closeParen);
+            if (hasArguments(args)) {
+                out.append(code, index, closeParen + 1);
+                index = closeParen + 1;
+                continue;
+            }
+
+            out.append(code, index, receiverStart);
+            out.append(simpleName(replacementClass))
+                    .append('.')
+                    .append(replacementMethod)
+                    .append('(')
+                    .append(receiver)
+                    .append(')');
             index = closeParen + 1;
         }
         return out.toString();
