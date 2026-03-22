@@ -91,6 +91,7 @@ final class TypeReferenceTransformer implements SourceTransformer {
     }
 
     private String replaceSimpleName(String code, String simpleName, String backportFqn) {
+        // Match only standalone type names, not qualified references or identifiers.
         Pattern pattern = Pattern.compile("(?<![\\p{L}\\p{N}_$.])" + Pattern.quote(simpleName) + "\\b");
         Matcher matcher = pattern.matcher(code);
         if (!matcher.find()) {
