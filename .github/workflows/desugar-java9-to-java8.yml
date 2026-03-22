@@ -159,14 +159,14 @@ jobs:
             mkdir -p "/tmp/java${release}sample/com/example" "/tmp/java${release}sample/classes"
           done
 
-          cat > /tmp/java9sample/com/example/Java9Program.java << 'JAVA'
+          cat > /tmp/java9sample/com/example/Java9FeaturesSample.java << 'JAVA'
           package com.example;
 
           import java.util.List;
           import java.util.Optional;
           import java.util.stream.Stream;
 
-          public class Java9Program {
+          public class Java9FeaturesSample {
               public static void main(String[] args) {
                   List<String> names = List.of("Alice", "Bob");
                   long positive = Stream.of(5, 4, -1).takeWhile(n -> n > 0).count();
@@ -180,7 +180,7 @@ jobs:
           }
           JAVA
 
-          cat > /tmp/java10sample/com/example/Java10Program.java << 'JAVA'
+          cat > /tmp/java10sample/com/example/Java10FeaturesSample.java << 'JAVA'
           package com.example;
 
           import java.util.Arrays;
@@ -189,7 +189,7 @@ jobs:
           import java.util.stream.Collectors;
           import java.util.stream.Stream;
 
-          public class Java10Program {
+          public class Java10FeaturesSample {
               public static void main(String[] args) {
                   List<String> copied = List.copyOf(Arrays.asList("x", "y", "x"));
                   List<String> unmodifiable = Stream.of("left", "right")
@@ -200,7 +200,7 @@ jobs:
           }
           JAVA
 
-          cat > /tmp/java11sample/com/example/Java11Program.java << 'JAVA'
+          cat > /tmp/java11sample/com/example/Java11FeaturesSample.java << 'JAVA'
           package com.example;
 
           import java.nio.file.Files;
@@ -208,9 +208,10 @@ jobs:
           import java.util.function.Predicate;
           import java.util.stream.Stream;
 
-          public class Java11Program {
+          public class Java11FeaturesSample {
               public static void main(String[] args) throws Exception {
-                  Path file = Path.of(System.getProperty("java.io.tmpdir"), "java11program.txt");
+                  Path tempDir = Path.of(System.getProperty("java.io.tmpdir"));
+                  Path file = Files.createTempFile(tempDir, "java11program", ".txt");
                   Files.writeString(file, "  hi  ");
                   String text = Files.readString(file);
                   String stripped = text.strip();
@@ -227,7 +228,7 @@ jobs:
           for release in 9 10 11; do
             javac --release "$release" \
               -d "/tmp/java${release}sample/classes" \
-              "/tmp/java${release}sample/com/example/Java${release}Program.java"
+              "/tmp/java${release}sample/com/example/Java${release}FeaturesSample.java"
             jar cf "/tmp/java${release}sample/java${release}sample.jar" \
               -C "/tmp/java${release}sample/classes" .
           done
@@ -244,9 +245,8 @@ jobs:
       - name: Verify Java 9-11 outputs are Java 8 class files
         run: |
           for release in 9 10 11; do
-            class_name="com.example.Java${release}Program"
             echo "Checking class version for Java ${release} sample"
-            javap -verbose -classpath "/tmp/java${release}sample/java8out.jar" "$class_name" | grep "major version: 52"
+            javap -verbose -classpath "/tmp/java${release}sample/java8out.jar" "com.example.Java${release}FeaturesSample" | grep "major version: 52"
           done
 
       - name: Set up Java 8 runtime
@@ -257,13 +257,13 @@ jobs:
 
       - name: Run desugared Java 9-11 programs on Java 8
         run: |
-          java -cp /tmp/java9sample/java8out.jar com.example.Java9Program | tee /tmp/java9sample/output.txt
+          java -cp /tmp/java9sample/java8out.jar com.example.Java9FeaturesSample | tee /tmp/java9sample/output.txt
           grep -Fx "2:2:empty" /tmp/java9sample/output.txt
 
-          java -cp /tmp/java10sample/java8out.jar com.example.Java10Program | tee /tmp/java10sample/output.txt
+          java -cp /tmp/java10sample/java8out.jar com.example.Java10FeaturesSample | tee /tmp/java10sample/output.txt
           grep -Fx "x:2:v" /tmp/java10sample/output.txt
 
-          java -cp /tmp/java11sample/java8out.jar com.example.Java11Program | tee /tmp/java11sample/output.txt
+          java -cp /tmp/java11sample/java8out.jar com.example.Java11FeaturesSample | tee /tmp/java11sample/output.txt
           grep -Fx "hi:true:2:haha" /tmp/java11sample/output.txt
 
       - name: Upload desugared output
