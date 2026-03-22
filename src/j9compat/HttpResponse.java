@@ -429,13 +429,13 @@ public interface HttpResponse<T> {
         }
 
         private static final class StreamingPipe {
-            private static final int BUFFER_SIZE = 65536;
+            private static final int PIPE_BUFFER_SIZE = 65536;
             private final java.io.PipedInputStream input;
             private final java.io.PipedOutputStream output;
 
             private StreamingPipe() {
                 try {
-                    this.input = new java.io.PipedInputStream(BUFFER_SIZE);
+                    this.input = new java.io.PipedInputStream(PIPE_BUFFER_SIZE);
                     this.output = new java.io.PipedOutputStream(input);
                 } catch (IOException e) {
                     throw new IllegalStateException(e);

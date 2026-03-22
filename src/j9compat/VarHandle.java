@@ -308,9 +308,9 @@ public final class VarHandle {
             UNSAFE_ACCESS.loadFence();
             return;
         }
-        int value = FENCE;
-        if (value == 0xdead) {
-            FENCE++;
+        int ignore = FENCE;
+        if (ignore != 0) {
+            // no-op
         }
     }
 

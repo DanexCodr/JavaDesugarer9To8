@@ -567,6 +567,7 @@ public abstract class HttpClient {
     }
 
     private static final class BodyPublisherWriter implements Flow.Subscriber<ByteBuffer> {
+        private static final long BODY_WRITE_TIMEOUT_MINUTES = 5;
         private final OutputStream out;
         private final CountDownLatch done = new CountDownLatch(1);
         private final AtomicReference<Throwable> error = new AtomicReference<Throwable>();
@@ -609,7 +610,7 @@ public abstract class HttpClient {
         }
 
         private void await() throws IOException, InterruptedException {
-            done.await(5, TimeUnit.MINUTES);
+            done.await(BODY_WRITE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
             try {
                 out.flush();
                 out.close();

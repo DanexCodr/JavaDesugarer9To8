@@ -244,7 +244,7 @@ public final class HttpClientBackportTest {
         private final byte[] payload;
 
         private FlowPublisher(String payload) {
-            this.payload = payload.getBytes();
+            this.payload = payload.getBytes(StandardCharsets.UTF_8);
         }
 
         @Override

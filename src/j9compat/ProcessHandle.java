@@ -83,6 +83,7 @@ final class ProcessHandleImpl implements ProcessHandle {
             new ConcurrentHashMap<Long, ProcessHandleImpl>();
     private static final ProcessHandleImpl CURRENT = createCurrent();
     private static volatile CompletableFuture<ProcessHandle> CURRENT_EXIT;
+    private static final long TERMINATE_WAIT_SECONDS = 5;
 
     static {
         if (CURRENT.pid > 0) {
@@ -453,7 +454,7 @@ final class ProcessHandleImpl implements ProcessHandle {
         }
         try {
             Process killer = new ProcessBuilder(command).redirectErrorStream(true).start();
-            killer.waitFor(5, TimeUnit.SECONDS);
+            killer.waitFor(TERMINATE_WAIT_SECONDS, TimeUnit.SECONDS);
             return killer.exitValue() == 0;
         } catch (Exception ignored) {
             return false;
