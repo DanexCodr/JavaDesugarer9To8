@@ -91,7 +91,7 @@ final class TypeReferenceTransformer implements SourceTransformer {
     }
 
     private String replaceSimpleName(String code, String simpleName, String backportFqn) {
-        Pattern pattern = Pattern.compile("(?:^|(?<=[^\\w$.]))" + Pattern.quote(simpleName) + "\\b");
+        Pattern pattern = Pattern.compile("(?<![\\p{L}\\p{N}_$.])" + Pattern.quote(simpleName) + "\\b");
         Matcher matcher = pattern.matcher(code);
         if (!matcher.find()) {
             return code;
