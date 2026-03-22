@@ -18,6 +18,7 @@ public final class OptionalBackportTest {
         testIfPresentOrElse();
         testOr();
         testStream();
+        testIsEmpty();
         testOrElseThrow();
     }
 
@@ -138,6 +139,18 @@ public final class OptionalBackportTest {
                 .collect(Collectors.toList());
         assertEquals(Arrays.asList("a", "b", "c"), flat,
                 "stream: flat-map over list of optionals filters empties");
+    }
+
+    // ── isEmpty ───────────────────────────────────────────────────────────────
+
+    static void testIsEmpty() {
+        assertTrue(OptionalBackport.isEmpty(Optional.empty()),
+                "isEmpty: empty optional returns true");
+        assertTrue(!OptionalBackport.isEmpty(Optional.of("x")),
+                "isEmpty: present optional returns false");
+        assertThrows(NullPointerException.class,
+                () -> OptionalBackport.isEmpty(null),
+                "isEmpty(null): throws NPE");
     }
 
     // ── orElseThrow ───────────────────────────────────────────────────────────

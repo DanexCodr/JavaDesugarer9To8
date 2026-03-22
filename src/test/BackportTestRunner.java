@@ -82,6 +82,10 @@ public final class BackportTestRunner {
         OptionalBackportTest.run();
         OptionalPrimitiveBackportTest.run();
         IOBackportTest.run();
+        StringBackportTest.run();
+        FilesBackportTest.run();
+        PathBackportTest.run();
+        PredicateBackportTest.run();
         CompletableFutureBackportTest.run();
         ProcessHandleBackportTest.run();
         FlowBackportTest.run();

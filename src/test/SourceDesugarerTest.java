@@ -30,7 +30,7 @@ public final class SourceDesugarerTest {
         BackportTestRunner.section("SourceDesugarer – module-info");
         testModuleInfo();
 
-        BackportTestRunner.section("SourceDesugarer – external Java 9 sources");
+        BackportTestRunner.section("SourceDesugarer – external Java 11 sources");
         testExternalSourcesCompile();
     }
 
@@ -90,9 +90,12 @@ public final class SourceDesugarerTest {
     }
 
     private static void testApiCalls() {
-        String input = "import java.util.List;\n"
+        String input = "import java.nio.file.Files;\n"
+                + "import java.nio.file.Path;\n"
+                + "import java.util.List;\n"
                 + "import java.util.Map;\n"
                 + "import java.util.Optional;\n"
+                + "import java.util.function.Predicate;\n"
                 + "import java.util.stream.Stream;\n"
                 + "public class Example {\n"
                 + "    void test() {\n"
@@ -101,6 +104,16 @@ public final class SourceDesugarerTest {
                 + "        Stream<String> stream = Stream.ofNullable(\"x\");\n"
                 + "        Optional<String> opt = Optional.empty();\n"
                 + "        opt.ifPresentOrElse(v -> {}, () -> {});\n"
+                + "        opt.isEmpty();\n"
+                + "        String raw = \"  hi \";\n"
+                + "        String stripped = raw.strip();\n"
+                + "        String blankValue = \" \";\n"
+                + "        boolean blank = blankValue.isBlank();\n"
+                + "        Path path = Path.of(\"sample.txt\");\n"
+                + "        Files.readString(path);\n"
+                + "        Files.writeString(path, \"data\");\n"
+                + "        Predicate<String> predicate = Predicate.not(String::isBlank);\n"
+                + "        String[] array = list.toArray(String[]::new);\n"
                 + "    }\n"
                 + "}\n";
 
@@ -111,6 +124,14 @@ public final class SourceDesugarerTest {
                 "StreamBackport import added");
         BackportTestRunner.assertTrue(output.contains("import j9compat.OptionalBackport;"),
                 "OptionalBackport import added");
+        BackportTestRunner.assertTrue(output.contains("import j9compat.StringBackport;"),
+                "StringBackport import added");
+        BackportTestRunner.assertTrue(output.contains("import j9compat.FilesBackport;"),
+                "FilesBackport import added");
+        BackportTestRunner.assertTrue(output.contains("import j9compat.PathBackport;"),
+                "PathBackport import added");
+        BackportTestRunner.assertTrue(output.contains("import j9compat.PredicateBackport;"),
+                "PredicateBackport import added");
         BackportTestRunner.assertTrue(output.contains("CollectionBackport.listOf"),
                 "List.of call rewritten");
         BackportTestRunner.assertTrue(output.contains("CollectionBackport.mapOf"),
@@ -119,6 +140,22 @@ public final class SourceDesugarerTest {
                 "Stream.ofNullable call rewritten");
         BackportTestRunner.assertTrue(output.contains("OptionalBackport.ifPresentOrElse(opt"),
                 "Optional.ifPresentOrElse call rewritten");
+        BackportTestRunner.assertTrue(output.contains("OptionalBackport.isEmpty(opt)"),
+                "Optional.isEmpty call rewritten");
+        BackportTestRunner.assertTrue(output.contains("StringBackport.strip(raw)"),
+                "String.strip call rewritten");
+        BackportTestRunner.assertTrue(output.contains("StringBackport.isBlank(blankValue)"),
+                "String.isBlank call rewritten");
+        BackportTestRunner.assertTrue(output.contains("PathBackport.of(\"sample.txt\")"),
+                "Path.of call rewritten");
+        BackportTestRunner.assertTrue(output.contains("FilesBackport.readString(path)"),
+                "Files.readString call rewritten");
+        BackportTestRunner.assertTrue(output.contains("FilesBackport.writeString(path, \"data\")"),
+                "Files.writeString call rewritten");
+        BackportTestRunner.assertTrue(output.contains("PredicateBackport.not(String::isBlank)"),
+                "Predicate.not call rewritten");
+        BackportTestRunner.assertTrue(output.contains("CollectionBackport.toArray(list, String[]::new)"),
+                "Collection.toArray(IntFunction) call rewritten");
     }
 
     private static void testStaticImport() {
@@ -148,11 +185,14 @@ public final class SourceDesugarerTest {
                                 + "\n"
                                 + "import java.io.InputStream;\n"
                                 + "import java.io.IOException;\n"
+                                + "import java.nio.file.Files;\n"
+                                + "import java.nio.file.Path;\n"
                                 + "import java.nio.charset.StandardCharsets;\n"
                                 + "import java.util.List;\n"
                                 + "import java.util.Map;\n"
                                 + "import java.util.Objects;\n"
                                 + "import java.util.Optional;\n"
+                                + "import java.util.function.Predicate;\n"
                                 + "import java.util.stream.Collectors;\n"
                                 + "import java.util.stream.Stream;\n"
                                 + "\n"
@@ -161,6 +201,34 @@ public final class SourceDesugarerTest {
                                 + "        byte[] data = in.readAllBytes();\n"
                                 + "        String text = new String(data, StandardCharsets.UTF_8);\n"
                                 + "        return List.of(text.split(\",\"));\n"
+                                + "    }\n"
+                                + "\n"
+                                + "    public String normalize(String name) {\n"
+                                + "        return name.strip();\n"
+                                + "    }\n"
+                                + "\n"
+                                + "    public boolean isBlank(String name) {\n"
+                                + "        return name.isBlank();\n"
+                                + "    }\n"
+                                + "\n"
+                                + "    public String loadText(Path path) throws IOException {\n"
+                                + "        return Files.readString(path);\n"
+                                + "    }\n"
+                                + "\n"
+                                + "    public Path writeText(Path path, String value) throws IOException {\n"
+                                + "        return Files.writeString(path, value);\n"
+                                + "    }\n"
+                                + "\n"
+                                + "    public Path defaultPath() {\n"
+                                + "        return Path.of(\"config.txt\");\n"
+                                + "    }\n"
+                                + "\n"
+                                + "    public Predicate<String> nonBlank() {\n"
+                                + "        return Predicate.not(String::isBlank);\n"
+                                + "    }\n"
+                                + "\n"
+                                + "    public String[] asArray(List<String> values) {\n"
+                                + "        return values.toArray(String[]::new);\n"
                                 + "    }\n"
                                 + "\n"
                                 + "    public Map<String, Integer> defaultScores() {\n"
@@ -270,9 +338,9 @@ public final class SourceDesugarerTest {
 
             int result = compiler.run(null, null, null, args.toArray(new String[0]));
             BackportTestRunner.assertEquals(0, result,
-                    "External Java 9 sources desugar and compile on Java 8");
+                    "External Java 11 sources desugar and compile on Java 8");
         } catch (Exception e) {
-            BackportTestRunner.fail("External Java 9 sources compile: " + e.getMessage());
+            BackportTestRunner.fail("External Java 11 sources compile: " + e.getMessage());
         }
     }
 

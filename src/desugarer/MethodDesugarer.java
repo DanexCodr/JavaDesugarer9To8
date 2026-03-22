@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ASM {@link MethodVisitor} that rewrites Java 9-only API calls to equivalent
+ * ASM {@link MethodVisitor} that rewrites Java 9–11 API calls to equivalent
  * calls on the j9compat backport library.
  *
  * <h2>Remapping strategy</h2>
@@ -23,7 +23,7 @@ import java.util.List;
  *       descriptor.</li>
  * </ul>
  *
- * <h2>Covered Java 9 APIs</h2>
+ * <h2>Covered Java 9–11 APIs</h2>
  * <ul>
  *   <li>{@code List.of}, {@code Set.of}, {@code Map.of}, {@code Map.ofEntries},
  *       {@code Map.entry}, {@code List.copyOf}, {@code Set.copyOf},
@@ -55,6 +55,14 @@ import java.util.List;
  *       {@code MethodHandles.arrayElementVarHandle}</li>
  *   <li>{@code Collectors.toUnmodifiableList/Set/Map} (Java 10)</li>
  *   <li>{@code Optional.orElseThrow()} (Java 10)</li>
+ *   <li>{@code String.isBlank}, {@code String.lines}, {@code String.strip},
+ *       {@code String.stripLeading}, {@code String.stripTrailing},
+ *       {@code String.repeat} (Java 11)</li>
+ *   <li>{@code Optional.isEmpty} and optional primitive {@code isEmpty} (Java 11)</li>
+ *   <li>{@code Collection.toArray(IntFunction)} (Java 11)</li>
+ *   <li>{@code Files.readString}, {@code Files.writeString} (Java 11)</li>
+ *   <li>{@code Path.of} (Java 11)</li>
+ *   <li>{@code Predicate.not} (Java 11)</li>
  * </ul>
  */
 public class MethodDesugarer extends LocalVariablesSorter {

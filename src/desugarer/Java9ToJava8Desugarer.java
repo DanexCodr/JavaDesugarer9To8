@@ -8,17 +8,17 @@ import java.util.*;
 import java.util.jar.*;
 
 /**
- * Java 9–10 → Java 8 Desugarer
+ * Java 9–11 → Java 8 Desugarer
  *
- * Processes a JAR compiled with Java 9–10 (class version 53–54) and produces
+ * Processes a JAR compiled with Java 9–11 (class version 53–55) and produces
  * a Java 8-compatible JAR (class version 52) by:
  *
- *  1. Downgrading the class-file version from 53 (Java 9) to 52 (Java 8).
+ *  1. Downgrading the class-file version from 53–55 (Java 9–11) to 52 (Java 8).
  *  2. Downgrading module-info.class entries so they remain present as metadata
  *     (the JPMS module system itself has no Java 8 equivalent).
  *  3. Making private interface methods package-private so that the Java 8
  *     verifier accepts them.
- *  4. Redirecting Java 9-only API calls to the j9compat backport library that
+ *  4. Redirecting Java 9–11 API calls to the j9compat backport library that
  *     is bundled inside the output JAR.
  *
  * The j9compat backport library covers:
@@ -36,6 +36,12 @@ import java.util.jar.*;
  *    orElseThrow)
  *  - java.io.InputStream additions               (transferTo, readAllBytes,
  *    readNBytes)
+ *  - java.lang.String additions                  (isBlank, lines, strip,
+ *    stripLeading, stripTrailing, repeat)
+ *  - java.nio.file.Files additions               (readString, writeString)
+ *  - java.nio.file.Path additions                (Path.of)
+ *  - java.util.function.Predicate additions      (Predicate.not)
+ *  - java.util.Collection additions              (toArray(IntFunction))
  *  - java.util.Objects additions                  (requireNonNullElse,
  *    requireNonNullElseGet, checkIndex)
  *  - java.util.concurrent.CompletableFuture additions  (orTimeout,
@@ -47,7 +53,7 @@ import java.util.jar.*;
  *
  * Usage:
  *   java -cp desugar9to8.jar:asm-9.4.jar:asm-commons-9.4.jar:asm-tree-9.4.jar \
- *        desugarer.Java9ToJava8Desugarer <input-java9.jar> <output-java8.jar>
+ *        desugarer.Java9ToJava8Desugarer <input-java9-11.jar> <output-java8.jar>
  */
 public class Java9ToJava8Desugarer {
 
@@ -72,7 +78,11 @@ public class Java9ToJava8Desugarer {
         "j9compat/OptionalLongBackport.class",
         "j9compat/OptionalDoubleBackport.class",
         "j9compat/IOBackport.class",
+        "j9compat/FilesBackport.class",
         "j9compat/ObjectsBackport.class",
+        "j9compat/StringBackport.class",
+        "j9compat/PredicateBackport.class",
+        "j9compat/PathBackport.class",
         "j9compat/CompletableFutureBackport.class",
         "j9compat/CollectorsBackport.class",
         "j9compat/ProcessHandle.class",
@@ -147,7 +157,7 @@ public class Java9ToJava8Desugarer {
             System.exit(1);
         }
 
-        System.out.println("=== Java 9–10 → Java 8 Desugarer ===");
+        System.out.println("=== Java 9–11 → Java 8 Desugarer ===");
         System.out.println("Input  : " + inputFile.getAbsolutePath());
         System.out.println("Output : " + new File(outputPath).getAbsolutePath());
         System.out.println("Mode   : " + (options.incremental ? "incremental" : "full"));
@@ -581,7 +591,7 @@ public class Java9ToJava8Desugarer {
         System.err.println(
             "   or: java -jar desugar9to8.jar --source <file> [--output <file>] [--compile] [--class-path <path>] [--dry-run] [--verbose]");
         System.err.println();
-        System.err.println("  <input.jar>            Java 9/10-compiled JAR to desugar");
+        System.err.println("  <input.jar>            Java 9/10/11-compiled JAR to desugar");
         System.err.println("  <output.jar>           Java 8-compatible output JAR");
         System.err.println("  [backport-classes-dir] Optional directory that contains compiled");
         System.err.println("                         j9compat/*.class backport files to bundle");

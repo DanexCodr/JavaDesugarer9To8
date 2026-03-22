@@ -2,6 +2,7 @@ package j9compat;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.IntFunction;
 
 /**
  * Java 8-compatible backport of the immutable-collection factory methods
@@ -97,6 +98,16 @@ public final class CollectionBackport {
             copy.add(e);
         }
         return Collections.unmodifiableList(copy);
+    }
+
+    // ── Collection.toArray(IntFunction) (Java 11) ────────────────────────────
+
+    public static <T> T[] toArray(Collection<T> collection,
+                                  IntFunction<T[]> generator) {
+        Objects.requireNonNull(collection, "collection");
+        Objects.requireNonNull(generator, "generator");
+        T[] array = generator.apply(collection.size());
+        return collection.toArray(array);
     }
 
     // ── Set.of ──────────────────────────────────────────────────────────────

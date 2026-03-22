@@ -8,7 +8,7 @@ import java.util.stream.IntStream;
 
 /**
  * Java 8-compatible backport of {@link java.util.OptionalInt} methods added
- * in Java 9.
+ * in Java 9/11.
  */
 public final class OptionalIntBackport {
 
@@ -33,6 +33,11 @@ public final class OptionalIntBackport {
         return optional.isPresent()
                 ? IntStream.of(optional.getAsInt())
                 : IntStream.empty();
+    }
+
+    public static boolean isEmpty(OptionalInt optional) {
+        Objects.requireNonNull(optional, "optional");
+        return !optional.isPresent();
     }
 
     public static int orElseThrow(OptionalInt optional) {

@@ -2,11 +2,19 @@ package j9compat;
 
 import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.OpenOption;
+import java.nio.file.Path;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.IntFunction;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
@@ -58,6 +66,16 @@ final class BackportMappings {
                 if ("copyOf".equals(name)) {
                     return BackportMethod.staticMethod(CollectionBackport.class,
                             "mapCopyOf", params);
+                }
+            }
+            if (owner == Collection.class
+                    || owner == java.util.List.class
+                    || owner == java.util.Set.class) {
+                if ("toArray".equals(name)
+                        && params.length == 1
+                        && params[0] == IntFunction.class) {
+                    return BackportMethod.instanceToStatic(CollectionBackport.class,
+                            "toArray", Collection.class, params);
                 }
             }
             if (owner == Stream.class) {
@@ -155,6 +173,10 @@ final class BackportMappings {
                     return BackportMethod.instanceToStatic(OptionalBackport.class,
                             "stream", Optional.class, params);
                 }
+                if ("isEmpty".equals(name) && params.length == 0) {
+                    return BackportMethod.instanceToStatic(OptionalBackport.class,
+                            "isEmpty", Optional.class, params);
+                }
                 if ("orElseThrow".equals(name) && params.length == 0) {
                     return BackportMethod.instanceToStatic(OptionalBackport.class,
                             "orElseThrow", Optional.class, params);
@@ -168,6 +190,10 @@ final class BackportMappings {
                 if ("stream".equals(name)) {
                     return BackportMethod.instanceToStatic(OptionalIntBackport.class,
                             "stream", OptionalInt.class, params);
+                }
+                if ("isEmpty".equals(name) && params.length == 0) {
+                    return BackportMethod.instanceToStatic(OptionalIntBackport.class,
+                            "isEmpty", OptionalInt.class, params);
                 }
                 if ("orElseThrow".equals(name) && params.length == 0) {
                     return BackportMethod.instanceToStatic(OptionalIntBackport.class,
@@ -183,6 +209,10 @@ final class BackportMappings {
                     return BackportMethod.instanceToStatic(OptionalLongBackport.class,
                             "stream", OptionalLong.class, params);
                 }
+                if ("isEmpty".equals(name) && params.length == 0) {
+                    return BackportMethod.instanceToStatic(OptionalLongBackport.class,
+                            "isEmpty", OptionalLong.class, params);
+                }
                 if ("orElseThrow".equals(name) && params.length == 0) {
                     return BackportMethod.instanceToStatic(OptionalLongBackport.class,
                             "orElseThrow", OptionalLong.class, params);
@@ -197,9 +227,41 @@ final class BackportMappings {
                     return BackportMethod.instanceToStatic(OptionalDoubleBackport.class,
                             "stream", OptionalDouble.class, params);
                 }
+                if ("isEmpty".equals(name) && params.length == 0) {
+                    return BackportMethod.instanceToStatic(OptionalDoubleBackport.class,
+                            "isEmpty", OptionalDouble.class, params);
+                }
                 if ("orElseThrow".equals(name) && params.length == 0) {
                     return BackportMethod.instanceToStatic(OptionalDoubleBackport.class,
                             "orElseThrow", OptionalDouble.class, params);
+                }
+            }
+            if (owner == String.class) {
+                if ("isBlank".equals(name) && params.length == 0) {
+                    return BackportMethod.instanceToStatic(StringBackport.class,
+                            "isBlank", String.class, params);
+                }
+                if ("lines".equals(name) && params.length == 0) {
+                    return BackportMethod.instanceToStatic(StringBackport.class,
+                            "lines", String.class, params);
+                }
+                if ("strip".equals(name) && params.length == 0) {
+                    return BackportMethod.instanceToStatic(StringBackport.class,
+                            "strip", String.class, params);
+                }
+                if ("stripLeading".equals(name) && params.length == 0) {
+                    return BackportMethod.instanceToStatic(StringBackport.class,
+                            "stripLeading", String.class, params);
+                }
+                if ("stripTrailing".equals(name) && params.length == 0) {
+                    return BackportMethod.instanceToStatic(StringBackport.class,
+                            "stripTrailing", String.class, params);
+                }
+                if ("repeat".equals(name)
+                        && params.length == 1
+                        && params[0] == Integer.TYPE) {
+                    return BackportMethod.instanceToStatic(StringBackport.class,
+                            "repeat", String.class, params);
                 }
             }
             if (isInputStreamOwner(owner)) {
@@ -237,6 +299,38 @@ final class BackportMappings {
                     return BackportMethod.staticMethod(ObjectsBackport.class,
                             "checkFromIndexSize", params);
                 }
+            }
+            if (owner == Files.class) {
+                if ("readString".equals(name)
+                        && (params.length == 1 && params[0] == Path.class
+                        || params.length == 2 && params[0] == Path.class && params[1] == Charset.class)) {
+                    return BackportMethod.staticMethod(FilesBackport.class,
+                            "readString", params);
+                }
+                if ("writeString".equals(name)
+                        && (params.length == 3 && params[0] == Path.class
+                        && params[1] == CharSequence.class && params[2] == OpenOption[].class
+                        || params.length == 4 && params[0] == Path.class
+                        && params[1] == CharSequence.class && params[2] == Charset.class
+                        && params[3] == OpenOption[].class)) {
+                    return BackportMethod.staticMethod(FilesBackport.class,
+                            "writeString", params);
+                }
+            }
+            if (owner == Path.class && "of".equals(name)) {
+                if (params.length == 2 && params[0] == String.class && params[1] == String[].class) {
+                    return BackportMethod.staticMethod(PathBackport.class,
+                            "of", params);
+                }
+                if (params.length == 1 && params[0] == URI.class) {
+                    return BackportMethod.staticMethod(PathBackport.class,
+                            "of", params);
+                }
+            }
+            if (owner == Predicate.class && "not".equals(name)
+                    && params.length == 1 && params[0] == Predicate.class) {
+                return BackportMethod.staticMethod(PredicateBackport.class,
+                        "not", params);
             }
             if (owner == CompletableFuture.class) {
                 if ("orTimeout".equals(name)) {

@@ -8,7 +8,7 @@ import java.util.stream.DoubleStream;
 
 /**
  * Java 8-compatible backport of {@link java.util.OptionalDouble} methods added
- * in Java 9.
+ * in Java 9/11.
  */
 public final class OptionalDoubleBackport {
 
@@ -33,6 +33,11 @@ public final class OptionalDoubleBackport {
         return optional.isPresent()
                 ? DoubleStream.of(optional.getAsDouble())
                 : DoubleStream.empty();
+    }
+
+    public static boolean isEmpty(OptionalDouble optional) {
+        Objects.requireNonNull(optional, "optional");
+        return !optional.isPresent();
     }
 
     public static double orElseThrow(OptionalDouble optional) {

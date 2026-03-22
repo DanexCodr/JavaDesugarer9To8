@@ -17,6 +17,10 @@ public final class ApiCallTransformer implements SourceTransformer {
     private static final String OBJECTS_BACKPORT = "j9compat.ObjectsBackport";
     private static final String COMPLETABLE_BACKPORT = "j9compat.CompletableFutureBackport";
     private static final String COLLECTORS_BACKPORT = "j9compat.CollectorsBackport";
+    private static final String STRING_BACKPORT = "j9compat.StringBackport";
+    private static final String FILES_BACKPORT = "j9compat.FilesBackport";
+    private static final String PATH_BACKPORT = "j9compat.PathBackport";
+    private static final String PREDICATE_BACKPORT = "j9compat.PredicateBackport";
 
     @Override
     public String transform(String source, SourceContext context) {
@@ -86,6 +90,14 @@ public final class ApiCallTransformer implements SourceTransformer {
                 "java.util.stream.Collectors", "Collectors", "toUnmodifiableSet", COLLECTORS_BACKPORT, "toUnmodifiableSet");
         updated = replaceStatic(updated, imports, context,
                 "java.util.stream.Collectors", "Collectors", "toUnmodifiableMap", COLLECTORS_BACKPORT, "toUnmodifiableMap");
+        updated = replaceStatic(updated, imports, context,
+                "java.nio.file.Files", "Files", "readString", FILES_BACKPORT, "readString");
+        updated = replaceStatic(updated, imports, context,
+                "java.nio.file.Files", "Files", "writeString", FILES_BACKPORT, "writeString");
+        updated = replaceStatic(updated, imports, context,
+                "java.nio.file.Path", "Path", "of", PATH_BACKPORT, "of");
+        updated = replaceStatic(updated, imports, context,
+                "java.util.function.Predicate", "Predicate", "not", PREDICATE_BACKPORT, "not");
 
         if (imports.isTypeImported("Stream", "java.util.stream.Stream")
                 || imports.isTypeImported("IntStream", "java.util.stream.IntStream")
@@ -122,6 +134,7 @@ public final class ApiCallTransformer implements SourceTransformer {
             updated = replaceInstance(updated, "ifPresentOrElse", OPTIONAL_BACKPORT, "ifPresentOrElse", context);
             updated = replaceInstance(updated, "or", OPTIONAL_BACKPORT, "or", context);
             updated = replaceInstance(updated, "stream", OPTIONAL_BACKPORT, "stream", context);
+            updated = replaceInstanceNoArgs(updated, "isEmpty", OPTIONAL_BACKPORT, "isEmpty", context);
             updated = replaceInstanceNoArgs(updated, "orElseThrow", OPTIONAL_BACKPORT, "orElseThrow", context);
         }
 
@@ -129,6 +142,7 @@ public final class ApiCallTransformer implements SourceTransformer {
                 || code.contains("java.util.OptionalInt")) {
             updated = replaceInstance(updated, "ifPresentOrElse", OPTIONAL_INT_BACKPORT, "ifPresentOrElse", context);
             updated = replaceInstance(updated, "stream", OPTIONAL_INT_BACKPORT, "stream", context);
+            updated = replaceInstanceNoArgs(updated, "isEmpty", OPTIONAL_INT_BACKPORT, "isEmpty", context);
             updated = replaceInstanceNoArgs(updated, "orElseThrow", OPTIONAL_INT_BACKPORT, "orElseThrow", context);
         }
 
@@ -136,6 +150,7 @@ public final class ApiCallTransformer implements SourceTransformer {
                 || code.contains("java.util.OptionalLong")) {
             updated = replaceInstance(updated, "ifPresentOrElse", OPTIONAL_LONG_BACKPORT, "ifPresentOrElse", context);
             updated = replaceInstance(updated, "stream", OPTIONAL_LONG_BACKPORT, "stream", context);
+            updated = replaceInstanceNoArgs(updated, "isEmpty", OPTIONAL_LONG_BACKPORT, "isEmpty", context);
             updated = replaceInstanceNoArgs(updated, "orElseThrow", OPTIONAL_LONG_BACKPORT, "orElseThrow", context);
         }
 
@@ -143,8 +158,21 @@ public final class ApiCallTransformer implements SourceTransformer {
                 || code.contains("java.util.OptionalDouble")) {
             updated = replaceInstance(updated, "ifPresentOrElse", OPTIONAL_DOUBLE_BACKPORT, "ifPresentOrElse", context);
             updated = replaceInstance(updated, "stream", OPTIONAL_DOUBLE_BACKPORT, "stream", context);
+            updated = replaceInstanceNoArgs(updated, "isEmpty", OPTIONAL_DOUBLE_BACKPORT, "isEmpty", context);
             updated = replaceInstanceNoArgs(updated, "orElseThrow", OPTIONAL_DOUBLE_BACKPORT, "orElseThrow", context);
         }
+
+        if (code.contains("isBlank") || code.contains("strip")
+                || code.contains("repeat") || code.contains("lines")) {
+            updated = replaceInstanceNoArgs(updated, "isBlank", STRING_BACKPORT, "isBlank", context);
+            updated = replaceInstanceNoArgs(updated, "strip", STRING_BACKPORT, "strip", context);
+            updated = replaceInstanceNoArgs(updated, "stripLeading", STRING_BACKPORT, "stripLeading", context);
+            updated = replaceInstanceNoArgs(updated, "stripTrailing", STRING_BACKPORT, "stripTrailing", context);
+            updated = replaceInstanceNoArgs(updated, "lines", STRING_BACKPORT, "lines", context);
+            updated = replaceInstance(updated, "repeat", STRING_BACKPORT, "repeat", context);
+        }
+
+        updated = replaceCollectionToArray(updated, context);
 
         if (imports.isTypeImported("InputStream", "java.io.InputStream")
                 || code.contains("java.io.InputStream")) {
@@ -161,6 +189,70 @@ public final class ApiCallTransformer implements SourceTransformer {
         }
 
         return updated;
+    }
+
+    private String replaceCollectionToArray(String code, SourceContext context) {
+        String updated = rewriteCollectionToArray(code);
+        if (!updated.equals(code)) {
+            context.addImport(COLLECTION_BACKPORT);
+        }
+        return updated;
+    }
+
+    private String rewriteCollectionToArray(String code) {
+        StringBuilder out = new StringBuilder(code.length());
+        int index = 0;
+        while (index < code.length()) {
+            int dotIndex = findDotMethod(code, "toArray", index);
+            if (dotIndex < 0) {
+                out.append(code.substring(index));
+                break;
+            }
+            int receiverEnd = dotIndex;
+            int receiverStart = findReceiverStart(code, receiverEnd - 1);
+            if (receiverStart < 0) {
+                out.append(code.substring(index, dotIndex + 1));
+                index = dotIndex + 1;
+                continue;
+            }
+            int methodStart = skipWhitespace(code, dotIndex + 1);
+            int parenIndex = skipWhitespace(code, methodStart + "toArray".length());
+            if (parenIndex >= code.length() || code.charAt(parenIndex) != '(') {
+                out.append(code.substring(index, dotIndex + 1));
+                index = dotIndex + 1;
+                continue;
+            }
+            int closeParen = findMatchingParen(code, parenIndex);
+            if (closeParen < 0) {
+                out.append(code.substring(index));
+                break;
+            }
+
+            String receiver = code.substring(receiverStart, receiverEnd).trim();
+            String args = code.substring(parenIndex + 1, closeParen);
+            if (countTopLevelArgs(args) != 1 || !looksLikeIntFunction(args)) {
+                out.append(code, index, closeParen + 1);
+                index = closeParen + 1;
+                continue;
+            }
+
+            out.append(code, index, receiverStart);
+            out.append(simpleName(COLLECTION_BACKPORT))
+                    .append(".toArray(")
+                    .append(receiver)
+                    .append(", ")
+                    .append(args)
+                    .append(")");
+            index = closeParen + 1;
+        }
+        return out.toString();
+    }
+
+    private boolean looksLikeIntFunction(String args) {
+        String stripped = stripComments(args).trim();
+        return stripped.contains("::")
+                || stripped.contains("->")
+                || stripped.contains("IntFunction");
     }
 
     private String replaceStatic(String code, ImportAnalyzer imports, SourceContext context,

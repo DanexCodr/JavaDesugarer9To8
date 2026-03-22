@@ -12,6 +12,7 @@ final class MethodTransformRegistry {
     static List<MethodTransform> load() {
         List<MethodTransform> transforms = new ArrayList<>();
         transforms.add(new Java10MethodTransform());
+        transforms.add(new Java11MethodTransform());
 
         ServiceLoader<MethodTransform> loader = ServiceLoader.load(MethodTransform.class);
         for (MethodTransform transform : loader) {

@@ -8,7 +8,7 @@ import java.util.stream.LongStream;
 
 /**
  * Java 8-compatible backport of {@link java.util.OptionalLong} methods added
- * in Java 9.
+ * in Java 9/11.
  */
 public final class OptionalLongBackport {
 
@@ -33,6 +33,11 @@ public final class OptionalLongBackport {
         return optional.isPresent()
                 ? LongStream.of(optional.getAsLong())
                 : LongStream.empty();
+    }
+
+    public static boolean isEmpty(OptionalLong optional) {
+        Objects.requireNonNull(optional, "optional");
+        return !optional.isPresent();
     }
 
     public static long orElseThrow(OptionalLong optional) {

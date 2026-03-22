@@ -22,6 +22,8 @@ import java.util.stream.Stream;
  *       present, otherwise an empty stream.</li>
  *   <li>{@code Optional.orElseThrow()} – returns the value or throws
  *       {@link NoSuchElementException} if empty.</li>
+ *   <li>{@code Optional.isEmpty()} – returns {@code true} if no value is
+ *       present.</li>
  * </ul>
  *
  * <p>Because these are instance methods on {@code Optional}, the desugarer
@@ -83,6 +85,14 @@ public final class OptionalBackport {
     public static <T> Stream<T> stream(Optional<T> optional) {
         Objects.requireNonNull(optional, "optional");
         return optional.isPresent() ? Stream.of(optional.get()) : Stream.empty();
+    }
+
+    /**
+     * Backport of {@code Optional.isEmpty()} (Java 11).
+     */
+    public static <T> boolean isEmpty(Optional<T> optional) {
+        Objects.requireNonNull(optional, "optional");
+        return !optional.isPresent();
     }
 
     /**

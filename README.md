@@ -1,19 +1,19 @@
-# Java 9–10 → Java 8 Desugarer
+# Java 9–11 → Java 8 Desugarer
 
-A bytecode-level tool that transforms a JAR compiled with **Java 9–10** into a
+A bytecode-level tool that transforms a JAR compiled with **Java 9–11** into a
 fully **Java 8-compatible** JAR, including a bundled runtime backport library
-(`j9compat`) that provides Java 8 implementations of every Java 9–10 API used.
+(`j9compat`) that provides Java 8 implementations of every Java 9–11 API used.
 
 **Compatibility focus:** runs on **Eclipse Temurin (Adoptium)** and targets
-**Android 11–15 (API 30–34)** deployments with Java 9–10 bytecode input.
+**Android 11–15 (API 30–34)** deployments with Java 9–11 bytecode input.
 
 ## What this repository provides
 
-- **Desugarer CLI**: rewrites Java 9–10 bytecode to Java 8 bytecode and optionally
+- **Desugarer CLI**: rewrites Java 9–11 bytecode to Java 8 bytecode and optionally
   bundles the backport classes into the output JAR.
-- **`j9compat` backport library**: Java 8 implementations of Java 9–10 APIs that
+- **`j9compat` backport library**: Java 8 implementations of Java 9–11 APIs that
   your desugared code calls at runtime.
-- **Source desugaring mode**: converts Java 9–10 source files to Java 8-compatible
+- **Source desugaring mode**: converts Java 9–11 source files to Java 8-compatible
   source (with an optional compile step).
 - **Incremental processing**: cache-based mode to speed up repeated desugaring
   runs for large JARs.
@@ -26,7 +26,7 @@ fully **Java 8-compatible** JAR, including a bundled runtime backport library
 
 | Transformation | Description |
 |----------------|-------------|
-| **Class-file version downgrade** | Changes class file major version from 53–54 (Java 9–10) to 52 (Java 8). |
+| **Class-file version downgrade** | Changes class file major version from 53–55 (Java 9–11) to 52 (Java 8). |
 | **Module-info retention** | Downgrades `module-info.class` so module metadata is preserved even though Java 8 ignores JPMS. |
 | **Private interface methods** | Java 9+ allows `private` methods in interfaces. This tool makes them package-private so the Java 8 verifier accepts them. |
 | **String concatenation** | Rewrites `invokedynamic` StringConcatFactory concatenation to `StringBuilder` bytecode. |
@@ -37,6 +37,9 @@ fully **Java 8-compatible** JAR, including a bundled runtime backport library
 | **Optional API additions** | Redirects `ifPresentOrElse()`, `or()`, `stream()`, and `orElseThrow()` to `j9compat.OptionalBackport`. |
 | **Optional primitive additions** | Redirects `OptionalInt/Long/Double.ifPresentOrElse()`, `.stream()`, and `.orElseThrow()` to `j9compat.Optional*Backport`. |
 | **InputStream additions** | Redirects `transferTo()`, `readAllBytes()`, and `readNBytes()` to `j9compat.IOBackport`. |
+| **String additions (Java 11)** | Redirects `String.isBlank()`, `String.lines()`, `String.strip*()`, and `String.repeat()` to `j9compat.StringBackport`. |
+| **NIO additions (Java 11)** | Redirects `Files.readString()`, `Files.writeString()`, and `Path.of()` to `j9compat.FilesBackport`/`PathBackport`. |
+| **Java 11 utilities** | Redirects `Optional.isEmpty()`, `Collection.toArray(IntFunction)`, and `Predicate.not()` to `j9compat` backports. |
 | **Objects additions** | Redirects `requireNonNullElse()`, `requireNonNullElseGet()`, `checkIndex()`, `checkFromToIndex()`, and `checkFromIndexSize()` to `j9compat.ObjectsBackport`. |
 | **CompletableFuture additions** | Redirects `orTimeout()`, `completeOnTimeout()`, `failedFuture()`, `completedStage()`, `failedStage()`, `minimalCompletionStage()`, `newIncompleteFuture()`, and `copy()` to `j9compat.CompletableFutureBackport`. |
 | **Process/Stack/Flow types** | Remaps `ProcessHandle`, `StackWalker`, `Flow`, and `SubmissionPublisher` to Java 8-compatible `j9compat` implementations. |
@@ -119,12 +122,12 @@ jar cfe build/desugar9to8.jar desugarer.Java9ToJava8Desugarer -C build/fatjar .
 ## Usage
 
 ```
-java -jar build/desugar9to8.jar [--incremental] [--cache-dir <dir>] [--class-path <path>] <input-java9-10.jar> <output-java8.jar> [backport-classes-dir]
+java -jar build/desugar9to8.jar [--incremental] [--cache-dir <dir>] [--class-path <path>] <input-java9-11.jar> <output-java8.jar> [backport-classes-dir]
 ```
 
 | Argument | Description |
 |----------|-------------|
-| `<input-java9-10.jar>` | JAR compiled with Java 9 or 10 (class version 53–54). |
+| `<input-java9-11.jar>` | JAR compiled with Java 9–11 (class version 53–55). |
 | `<output-java8.jar>` | Path for the Java 8-compatible output JAR. |
 | `[backport-classes-dir]` | Optional: directory containing compiled `j9compat/*.class` files. If provided, the backport classes are bundled into the output JAR. |
 | `--incremental` | Enable incremental mode (reuse unchanged output entries). |
@@ -139,7 +142,7 @@ java -jar build/desugar9to8.jar \
   my-app-java8.jar \
   build/backport
 
-### Source desugaring (Java 9–10 → Java 8 source)
+### Source desugaring (Java 9–11 → Java 8 source)
 
 ```
 java -jar build/desugar9to8.jar --source MyApp.java --output MyApp.java8.java
@@ -155,7 +158,7 @@ java -jar build/desugar9to8.jar --source MyApp.java --compile
 The output JAR will:
 - Have all class files at version 52 (Java 8).
 - Contain the `j9compat.*` backport classes.
-- Redirect every Java 9–10 API call to the corresponding backport method.
+- Redirect every Java 9–11 API call to the corresponding backport method.
 
 ### Framework-style extensions
 
@@ -248,7 +251,7 @@ javac --release 8 \
 
 ---
 
-## Java 9–10 features covered
+## Java 9–11 features covered
 
 ### Collection factory methods
 All Java 9 immutable-collection factory methods are replaced with Java 8
@@ -294,6 +297,7 @@ opt.ifPresentOrElse(a, e)      --> OptionalBackport.ifPresentOrElse(opt, a, e)
 opt.or(supplier)               --> OptionalBackport.or(opt, supplier)
 opt.stream()                   --> OptionalBackport.stream(opt)
 opt.orElseThrow()              --> OptionalBackport.orElseThrow(opt)
+opt.isEmpty()                  --> OptionalBackport.isEmpty(opt)
 ```
 
 ### Optional primitive API
@@ -302,6 +306,7 @@ optInt.ifPresentOrElse(a, e)   --> OptionalIntBackport.ifPresentOrElse(optInt, a
 optLong.stream()               --> OptionalLongBackport.stream(optLong)
 optDouble.stream()             --> OptionalDoubleBackport.stream(optDouble)
 optInt.orElseThrow()           --> OptionalIntBackport.orElseThrow(optInt)
+optLong.isEmpty()              --> OptionalLongBackport.isEmpty(optLong)
 ```
 
 ### InputStream API
@@ -309,6 +314,27 @@ optInt.orElseThrow()           --> OptionalIntBackport.orElseThrow(optInt)
 in.transferTo(out)             --> IOBackport.transferTo(in, out)
 in.readAllBytes()              --> IOBackport.readAllBytes(in)
 in.readNBytes(buf, off, len)   --> IOBackport.readNBytes(in, buf, off, len)
+```
+
+### String API (Java 11)
+```java
+" hi ".strip()                 --> StringBackport.strip(" hi ")
+" ".isBlank()                  --> StringBackport.isBlank(" ")
+"x".repeat(3)                   --> StringBackport.repeat("x", 3)
+text.lines()                   --> StringBackport.lines(text)
+```
+
+### Files/Path API (Java 11)
+```java
+Files.readString(path)         --> FilesBackport.readString(path)
+Files.writeString(path, text)  --> FilesBackport.writeString(path, text)
+Path.of("config.txt")          --> PathBackport.of("config.txt")
+```
+
+### Utility additions (Java 11)
+```java
+Predicate.not(p)               --> PredicateBackport.not(p)
+values.toArray(String[]::new)  --> CollectionBackport.toArray(values, String[]::new)
 ```
 
 ### Objects API
@@ -378,7 +404,7 @@ The desugarer is built on **ASM 9.4** (ObjectWeb ASM bytecode library).
 2. **`ClassDesugarer`** (a `ClassVisitor`) downgrades the class-file version and
    strips `ACC_PRIVATE` from interface methods.
 3. **`MethodDesugarer`** (a `MethodVisitor`) intercepts every
-   `visitMethodInsn()` call and rewrites matching Java 9–10 API calls:
+   `visitMethodInsn()` call and rewrites matching Java 9–11 API calls:
    - *Static-to-static*: same descriptor, new owner/name, `isInterface=false`.
    - *Instance-to-static*: the receiver is prepended to the descriptor, and
      `INVOKEVIRTUAL`/`INVOKEINTERFACE` becomes `INVOKESTATIC`. The operand
@@ -407,6 +433,6 @@ desugar any JAR attached to the latest release.
 
 ## Limitations
 
-Java 9–10 API call sites listed above are redirected to the `j9compat` backports.
+Java 9–11 API call sites listed above are redirected to the `j9compat` backports.
 Java 11+ APIs are not yet desugared. For status details, see
 [LIMITATIONS.md](LIMITATIONS.md).

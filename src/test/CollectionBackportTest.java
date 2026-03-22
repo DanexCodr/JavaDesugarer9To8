@@ -34,6 +34,9 @@ public final class CollectionBackportTest {
         testMapEntry();
         testMapOfEntries();
         testMapCopyOf();
+
+        section("CollectionBackport – toArray");
+        testToArray();
     }
 
     // ── List.of ──────────────────────────────────────────────────────────────
@@ -315,5 +318,31 @@ public final class CollectionBackportTest {
         assertThrows(NullPointerException.class,
                 () -> CollectionBackport.mapCopyOf(null),
                 "mapCopyOf(null): throws NPE");
+    }
+
+    // ── Collection.toArray(IntFunction) ──────────────────────────────────────
+
+    static void testToArray() {
+        List<String> values = Arrays.asList("a", "b", "c");
+        int[] size = {-1};
+        String[] result = CollectionBackport.toArray(values, count -> {
+            size[0] = count;
+            return new String[count];
+        });
+        assertEquals(3, size[0], "toArray: generator called with size");
+        assertEquals(3, result.length, "toArray: result length matches size");
+        assertEquals("a", result[0], "toArray: first element");
+        assertEquals("c", result[2], "toArray: last element");
+
+        List<String> empty = Collections.emptyList();
+        String[] emptyResult = CollectionBackport.toArray(empty, String[]::new);
+        assertEquals(0, emptyResult.length, "toArray: empty collection returns empty array");
+
+        assertThrows(NullPointerException.class,
+                () -> CollectionBackport.toArray(null, String[]::new),
+                "toArray(null collection): throws NPE");
+        assertThrows(NullPointerException.class,
+                () -> CollectionBackport.toArray(values, null),
+                "toArray(null generator): throws NPE");
     }
 }

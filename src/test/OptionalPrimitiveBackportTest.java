@@ -52,6 +52,13 @@ public final class OptionalPrimitiveBackportTest {
         assertThrows(java.util.NoSuchElementException.class,
                 () -> OptionalIntBackport.orElseThrow(OptionalInt.empty()),
                 "OptionalInt.orElseThrow: empty optional throws");
+        assertTrue(OptionalIntBackport.isEmpty(OptionalInt.empty()),
+                "OptionalInt.isEmpty: empty returns true");
+        assertTrue(!OptionalIntBackport.isEmpty(OptionalInt.of(1)),
+                "OptionalInt.isEmpty: present returns false");
+        assertThrows(NullPointerException.class,
+                () -> OptionalIntBackport.isEmpty(null),
+                "OptionalInt.isEmpty(null): throws NPE");
     }
 
     private static void testOptionalLong() {
@@ -80,6 +87,13 @@ public final class OptionalPrimitiveBackportTest {
         assertThrows(java.util.NoSuchElementException.class,
                 () -> OptionalLongBackport.orElseThrow(OptionalLong.empty()),
                 "OptionalLong.orElseThrow: empty optional throws");
+        assertTrue(OptionalLongBackport.isEmpty(OptionalLong.empty()),
+                "OptionalLong.isEmpty: empty returns true");
+        assertTrue(!OptionalLongBackport.isEmpty(OptionalLong.of(1L)),
+                "OptionalLong.isEmpty: present returns false");
+        assertThrows(NullPointerException.class,
+                () -> OptionalLongBackport.isEmpty(null),
+                "OptionalLong.isEmpty(null): throws NPE");
     }
 
     private static void testOptionalDouble() {
@@ -108,5 +122,12 @@ public final class OptionalPrimitiveBackportTest {
         assertThrows(java.util.NoSuchElementException.class,
                 () -> OptionalDoubleBackport.orElseThrow(OptionalDouble.empty()),
                 "OptionalDouble.orElseThrow: empty optional throws");
+        assertTrue(OptionalDoubleBackport.isEmpty(OptionalDouble.empty()),
+                "OptionalDouble.isEmpty: empty returns true");
+        assertTrue(!OptionalDoubleBackport.isEmpty(OptionalDouble.of(0.5)),
+                "OptionalDouble.isEmpty: present returns false");
+        assertThrows(NullPointerException.class,
+                () -> OptionalDoubleBackport.isEmpty(null),
+                "OptionalDouble.isEmpty(null): throws NPE");
     }
 }

@@ -186,7 +186,7 @@ public final class Java9SourceDesugarer {
     private static void printUsage() {
         System.err.println("Usage: java -jar desugar9to8.jar --source <file> [--output <file>] [--compile] [--class-path <path>] [--dry-run] [--verbose]");
         System.err.println();
-        System.err.println("  --source <file>        Java 9 source file to desugar");
+        System.err.println("  --source <file>        Java 9–11 source file to desugar");
         System.err.println("  --output <file>        Output file (default: <name>.java8.java)");
         System.err.println("  --compile              Compile output with javac -source 8 -target 8");
         System.err.println("  --class-path <path>    Classpath to use when compiling");
