@@ -100,7 +100,7 @@ public interface HttpResponse<T> {
         private static final class ByteArrayBodyHandler implements BodyHandler<byte[]> {
             @Override
             public BodySubscriber<byte[]> apply(ResponseInfo responseInfo) {
-                return new ByteArraySubscriber<byte[]>(StandardCharsets.UTF_8) {
+                return new ByteArraySubscriber<byte[]>(null) {
                     @Override
                     byte[] convert(byte[] bytes, Charset charset) {
                         return bytes;
@@ -112,7 +112,7 @@ public interface HttpResponse<T> {
         private static final class InputStreamBodyHandler implements BodyHandler<InputStream> {
             @Override
             public BodySubscriber<InputStream> apply(ResponseInfo responseInfo) {
-                return new ByteArraySubscriber<InputStream>(StandardCharsets.UTF_8) {
+                return new ByteArraySubscriber<InputStream>(null) {
                     @Override
                     InputStream convert(byte[] bytes, Charset charset) {
                         return new ByteArrayInputStream(bytes);
