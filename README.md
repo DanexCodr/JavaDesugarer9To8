@@ -1,4 +1,4 @@
-# Java 9 → Java 8 Desugarer
+# Java 9+ → Java 8 Desugarer
 
 A bytecode-level tool that transforms a JAR compiled with **Java 9** into a
 fully **Java 8-compatible** JAR, including a bundled runtime backport library
