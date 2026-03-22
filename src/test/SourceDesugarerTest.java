@@ -30,6 +30,9 @@ public final class SourceDesugarerTest {
         BackportTestRunner.section("SourceDesugarer – module-info");
         testModuleInfo();
 
+        BackportTestRunner.section("SourceDesugarer – Java 11 type references");
+        testJava11TypeReferences();
+
         BackportTestRunner.section("SourceDesugarer – external Java 11 sources");
         testExternalSourcesCompile();
     }
@@ -176,6 +179,67 @@ public final class SourceDesugarerTest {
         String output = new SourceDesugarer().desugar(input, "module-info.java", false);
         BackportTestRunner.assertTrue(output.startsWith("/* module-info.java desugared"),
                 "module-info.java converted to comment");
+    }
+
+    private static void testJava11TypeReferences() {
+        String input = "import java.lang.invoke.MethodHandles;\n"
+                + "import java.lang.invoke.VarHandle;\n"
+                + "import java.net.URI;\n"
+                + "import java.net.http.HttpClient;\n"
+                + "import java.net.http.HttpRequest;\n"
+                + "import java.net.http.HttpResponse;\n"
+                + "import java.util.concurrent.Flow;\n"
+                + "import java.util.concurrent.SubmissionPublisher;\n"
+                + "public class Example {\n"
+                + "    private int value;\n"
+                + "    public HttpClient client() {\n"
+                + "        return HttpClient.newHttpClient();\n"
+                + "    }\n"
+                + "    public HttpRequest request(URI uri) {\n"
+                + "        return HttpRequest.newBuilder(uri).GET().build();\n"
+                + "    }\n"
+                + "    public HttpResponse.BodyHandler<String> handler() {\n"
+                + "        return HttpResponse.BodyHandlers.ofString();\n"
+                + "    }\n"
+                + "    public Flow.Publisher<String> publisher() {\n"
+                + "        return new SubmissionPublisher<String>();\n"
+                + "    }\n"
+                + "    public VarHandle handle(MethodHandles.Lookup lookup) throws Exception {\n"
+                + "        return lookup.findVarHandle(Example.class, \"value\", int.class);\n"
+                + "    }\n"
+                + "    public VarHandle arrayHandle() {\n"
+                + "        return MethodHandles.arrayElementVarHandle(int[].class);\n"
+                + "    }\n"
+                + "    public Module module() {\n"
+                + "        return getClass().getModule();\n"
+                + "    }\n"
+                + "}\n";
+
+        String output = new SourceDesugarer().desugar(input, "Example.java", false);
+        BackportTestRunner.assertTrue(output.contains("import j9compat.HttpClient;"),
+                "HttpClient import remapped");
+        BackportTestRunner.assertTrue(output.contains("import j9compat.HttpRequest;"),
+                "HttpRequest import remapped");
+        BackportTestRunner.assertTrue(output.contains("import j9compat.HttpResponse;"),
+                "HttpResponse import remapped");
+        BackportTestRunner.assertTrue(output.contains("import j9compat.Flow;"),
+                "Flow import remapped");
+        BackportTestRunner.assertTrue(output.contains("import j9compat.SubmissionPublisher;"),
+                "SubmissionPublisher import remapped");
+        BackportTestRunner.assertTrue(output.contains("import j9compat.VarHandle;"),
+                "VarHandle import remapped");
+        BackportTestRunner.assertTrue(output.contains("import j9compat.MethodHandlesBackport;"),
+                "MethodHandlesBackport import added");
+        BackportTestRunner.assertTrue(output.contains("import j9compat.ModuleBackport;"),
+                "ModuleBackport import added");
+        BackportTestRunner.assertTrue(output.contains("MethodHandlesBackport.findVarHandle(lookup"),
+                "VarHandle lookup remapped");
+        BackportTestRunner.assertTrue(output.contains("MethodHandlesBackport.arrayElementVarHandle"),
+                "Array VarHandle lookup remapped");
+        BackportTestRunner.assertTrue(output.contains("ModuleBackport.getModule(getClass())"),
+                "Class.getModule remapped");
+        BackportTestRunner.assertTrue(output.contains("j9compat.Module module()"),
+                "Module type remapped");
     }
 
     private static void testExternalSourcesCompile() {

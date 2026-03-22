@@ -439,5 +439,5 @@ desugar any JAR attached to the latest release.
 ## Limitations
 
 Java 9–11 API call sites listed above are redirected to the `j9compat` backports.
-Java 11+ APIs are not yet desugared. For status details, see
+Java 12+ APIs are not yet desugared. For status details, see
 [LIMITATIONS.md](LIMITATIONS.md).

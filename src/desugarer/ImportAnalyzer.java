@@ -90,6 +90,10 @@ public final class ImportAnalyzer {
         return Collections.unmodifiableSet(existingImports);
     }
 
+    public String getExplicitImport(String simpleName) {
+        return explicitImports.get(simpleName);
+    }
+
     public static String applyImports(String source, ImportAnalyzer analyzer, Set<String> neededImports) {
         if (neededImports.isEmpty()) {
             return source;

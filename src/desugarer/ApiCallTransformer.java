@@ -21,6 +21,8 @@ public final class ApiCallTransformer implements SourceTransformer {
     private static final String FILES_BACKPORT = "j9compat.FilesBackport";
     private static final String PATH_BACKPORT = "j9compat.PathBackport";
     private static final String PREDICATE_BACKPORT = "j9compat.PredicateBackport";
+    private static final String MODULE_BACKPORT = "j9compat.ModuleBackport";
+    private static final String METHOD_HANDLES_BACKPORT = "j9compat.MethodHandlesBackport";
 
     @Override
     public String transform(String source, SourceContext context) {
@@ -186,6 +188,20 @@ public final class ApiCallTransformer implements SourceTransformer {
             updated = replaceInstance(updated, "orTimeout", COMPLETABLE_BACKPORT, "orTimeout", context);
             updated = replaceInstance(updated, "completeOnTimeout", COMPLETABLE_BACKPORT, "completeOnTimeout", context);
             updated = replaceInstance(updated, "copy", COMPLETABLE_BACKPORT, "copy", context);
+        }
+
+        updated = replaceInstanceNoArgs(updated, "getModule", MODULE_BACKPORT, "getModule", context);
+
+        boolean hasMethodHandles = imports.isTypeImported("MethodHandles", "java.lang.invoke.MethodHandles")
+                || code.contains("MethodHandles");
+        if (hasMethodHandles) {
+            updated = replaceInstanceInsertReceiver(updated, "findVarHandle", METHOD_HANDLES_BACKPORT,
+                    "findVarHandle", context);
+            updated = replaceInstanceInsertReceiver(updated, "findStaticVarHandle", METHOD_HANDLES_BACKPORT,
+                    "findStaticVarHandle", context);
+            updated = replaceStatic(updated, imports, context,
+                    "java.lang.invoke.MethodHandles", "MethodHandles",
+                    "arrayElementVarHandle", METHOD_HANDLES_BACKPORT, "arrayElementVarHandle");
         }
 
         return updated;
@@ -356,6 +372,16 @@ public final class ApiCallTransformer implements SourceTransformer {
         return updated;
     }
 
+    private String replaceInstanceInsertReceiver(String code, String method,
+                                                 String replacementClass, String replacementMethod,
+                                                 SourceContext context) {
+        String updated = rewriteInstanceCallsInsertReceiver(code, method, replacementClass, replacementMethod);
+        if (!updated.equals(code)) {
+            context.addImport(replacementClass);
+        }
+        return updated;
+    }
+
     private String rewriteInstanceCalls(String code, String method,
                                         String replacementClass, String replacementMethod) {
         StringBuilder out = new StringBuilder(code.length());
@@ -402,6 +428,44 @@ public final class ApiCallTransformer implements SourceTransformer {
             }
             out.append(')');
             index = closeParen + 1;
+        }
+        return out.toString();
+    }
+
+    private String rewriteInstanceCallsInsertReceiver(String code, String method,
+                                                      String replacementClass, String replacementMethod) {
+        StringBuilder out = new StringBuilder(code.length());
+        int index = 0;
+        while (index < code.length()) {
+            int dotIndex = findDotMethod(code, method, index);
+            if (dotIndex < 0) {
+                out.append(code.substring(index));
+                break;
+            }
+            int receiverEnd = dotIndex;
+            int receiverStart = findReceiverStart(code, receiverEnd - 1);
+            if (receiverStart < 0) {
+                out.append(code.substring(index, dotIndex + 1));
+                index = dotIndex + 1;
+                continue;
+            }
+            int methodStart = skipWhitespace(code, dotIndex + 1);
+            int parenIndex = skipWhitespace(code, methodStart + method.length());
+            if (parenIndex >= code.length() || code.charAt(parenIndex) != '(') {
+                out.append(code.substring(index, dotIndex + 1));
+                index = dotIndex + 1;
+                continue;
+            }
+
+            String receiver = code.substring(receiverStart, receiverEnd).trim();
+            out.append(code, index, receiverStart);
+            out.append(simpleName(replacementClass))
+                    .append('.')
+                    .append(replacementMethod)
+                    .append('(')
+                    .append(receiver)
+                    .append(", ");
+            index = parenIndex + 1;
         }
         return out.toString();
     }

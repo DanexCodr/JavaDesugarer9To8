@@ -10,6 +10,7 @@ public final class SourceDesugarer {
     public SourceDesugarer() {
         this.transformers = Arrays.asList(
                 new ModuleInfoTransformer(),
+                new TypeReferenceTransformer(),
                 new PrivateInterfaceMethodTransformer(),
                 new DiamondOperatorTransformer(),
                 new TryWithResourcesTransformer(),
