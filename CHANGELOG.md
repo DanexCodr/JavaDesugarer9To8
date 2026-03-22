@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- Added Java 11 HTTP client backport support (`HttpClient`, `HttpRequest`, `HttpResponse`, `HttpHeaders`).
 - Added a Temurin-only runtime check and updated docs to focus on Android 11–15
   compatibility for Java 9 inputs.
 - Added native incremental mode with a persistent cache for unchanged JAR

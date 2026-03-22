@@ -93,6 +93,7 @@ public final class BackportTestRunner {
         ModuleBackportTest.run();
         VarHandleBackportTest.run();
         ReflectionBackportTest.run();
+        HttpClientBackportTest.run();
         SourceDesugarerTest.run();
 
         System.out.println("\n=== Results ===");

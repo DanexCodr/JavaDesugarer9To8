@@ -39,6 +39,7 @@ fully **Java 8-compatible** JAR, including a bundled runtime backport library
 | **InputStream additions** | Redirects `transferTo()`, `readAllBytes()`, and `readNBytes()` to `j9compat.IOBackport`. |
 | **String additions (Java 11)** | Redirects `String.isBlank()`, `String.lines()`, `String.strip*()`, and `String.repeat()` to `j9compat.StringBackport`. |
 | **NIO additions (Java 11)** | Redirects `Files.readString()`, `Files.writeString()`, and `Path.of()` to `j9compat.FilesBackport`/`PathBackport`. |
+| **HTTP client (Java 11)** | Remaps `HttpClient`, `HttpRequest`, `HttpResponse`, and `HttpHeaders` APIs to the `j9compat` HTTP backport. |
 | **Java 11 utilities** | Redirects `Optional.isEmpty()`, `Collection.toArray(IntFunction)`, and `Predicate.not()` to `j9compat` backports. |
 | **Objects additions** | Redirects `requireNonNullElse()`, `requireNonNullElseGet()`, `checkIndex()`, `checkFromToIndex()`, and `checkFromIndexSize()` to `j9compat.ObjectsBackport`. |
 | **CompletableFuture additions** | Redirects `orTimeout()`, `completeOnTimeout()`, `failedFuture()`, `completedStage()`, `failedStage()`, `minimalCompletionStage()`, `newIncompleteFuture()`, and `copy()` to `j9compat.CompletableFutureBackport`. |
@@ -78,6 +79,10 @@ fully **Java 8-compatible** JAR, including a bundled runtime backport library
 │       ├── ObjectsBackport.java        Objects additions
 │       ├── CollectorsBackport.java     Collectors additions
 │       ├── CompletableFutureBackport.java  CompletableFuture additions
+│       ├── HttpClient.java             HTTP client backport
+│       ├── HttpRequest.java            HTTP request builder + body publishers
+│       ├── HttpResponse.java           HTTP response handlers
+│       ├── HttpHeaders.java            HTTP headers helper
 │       ├── ProcessHandle.java          ProcessHandle backport
 │       ├── StackWalker.java            StackWalker backport
 │       ├── Flow.java                   Flow (Reactive Streams) interfaces

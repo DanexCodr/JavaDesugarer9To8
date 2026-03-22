@@ -41,6 +41,7 @@ import java.util.jar.*;
  *  - java.nio.file.Files additions               (readString, writeString)
  *  - java.nio.file.Path additions                (Path.of)
  *  - java.util.function.Predicate additions      (Predicate.not)
+ *  - java.net.http.HttpClient additions          (HttpClient/HttpRequest/HttpResponse/HttpHeaders)
  *  - java.util.Collection additions              (toArray(IntFunction))
  *  - java.util.Objects additions                  (requireNonNullElse,
  *    requireNonNullElseGet, checkIndex)
@@ -83,6 +84,21 @@ public class Java9ToJava8Desugarer {
         "j9compat/StringBackport.class",
         "j9compat/PredicateBackport.class",
         "j9compat/PathBackport.class",
+        "j9compat/HttpClient.class",
+        "j9compat/HttpClient$Builder.class",
+        "j9compat/HttpClient$Redirect.class",
+        "j9compat/HttpClient$Version.class",
+        "j9compat/HttpHeaders.class",
+        "j9compat/HttpRequest.class",
+        "j9compat/HttpRequest$BodyPublisher.class",
+        "j9compat/HttpRequest$BodyPublishers.class",
+        "j9compat/HttpRequest$Builder.class",
+        "j9compat/HttpResponse.class",
+        "j9compat/HttpResponse$BodyHandler.class",
+        "j9compat/HttpResponse$BodyHandlers.class",
+        "j9compat/HttpResponse$BodySubscriber.class",
+        "j9compat/HttpResponse$ResponseInfo.class",
+        "j9compat/HttpResponse$PushPromiseHandler.class",
         "j9compat/CompletableFutureBackport.class",
         "j9compat/CollectorsBackport.class",
         "j9compat/ProcessHandle.class",
