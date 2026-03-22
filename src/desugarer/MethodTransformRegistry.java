@@ -15,9 +15,7 @@ final class MethodTransformRegistry {
 
         ServiceLoader<MethodTransform> loader = ServiceLoader.load(MethodTransform.class);
         for (MethodTransform transform : loader) {
-            if (transform != null) {
-                transforms.add(transform);
-            }
+            transforms.add(transform);
         }
         return Collections.unmodifiableList(transforms);
     }
