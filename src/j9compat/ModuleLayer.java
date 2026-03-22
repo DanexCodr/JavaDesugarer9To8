@@ -207,14 +207,23 @@ public final class ModuleLayer {
         }
 
         public Controller addReads(Module source, Module target) {
+            if (source != null) {
+                source.addReads(target);
+            }
             return this;
         }
 
         public Controller addExports(Module source, String pkg, Module target) {
+            if (source != null) {
+                source.addExports(pkg, target);
+            }
             return this;
         }
 
         public Controller addOpens(Module source, String pkg, Module target) {
+            if (source != null) {
+                source.addOpens(pkg, target);
+            }
             return this;
         }
     }

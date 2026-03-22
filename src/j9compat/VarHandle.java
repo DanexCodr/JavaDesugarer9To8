@@ -8,6 +8,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import sun.misc.Unsafe;
 
 /**
  * Java 8-compatible backport of {@link java.lang.invoke.VarHandle}.
@@ -52,6 +53,9 @@ public final class VarHandle {
     private final List<Class<?>> coordinateTypes;
     private final Access access;
     private final boolean exact;
+    private static final UnsafeAccess UNSAFE_ACCESS = UnsafeAccess.create();
+    private static final Object FENCE_LOCK = new Object();
+    private static volatile int FENCE;
 
     private VarHandle(Class<?> varType, List<Class<?>> coordinateTypes, Access access, boolean exact) {
         this.varType = varType;
@@ -290,23 +294,40 @@ public final class VarHandle {
     }
 
     public static void fullFence() {
-        // no-op in Java 8
+        if (UNSAFE_ACCESS != null && UNSAFE_ACCESS.fullFence != null) {
+            UNSAFE_ACCESS.fullFence();
+            return;
+        }
+        synchronized (FENCE_LOCK) {
+            FENCE++;
+        }
     }
 
     public static void acquireFence() {
-        // no-op in Java 8
+        if (UNSAFE_ACCESS != null && UNSAFE_ACCESS.loadFence != null) {
+            UNSAFE_ACCESS.loadFence();
+            return;
+        }
+        int ignore = FENCE;
+        if (ignore != 0) {
+            // no-op
+        }
     }
 
     public static void releaseFence() {
-        // no-op in Java 8
+        if (UNSAFE_ACCESS != null && UNSAFE_ACCESS.storeFence != null) {
+            UNSAFE_ACCESS.storeFence();
+            return;
+        }
+        FENCE = 0;
     }
 
     public static void loadLoadFence() {
-        // no-op in Java 8
+        acquireFence();
     }
 
     public static void storeStoreFence() {
-        // no-op in Java 8
+        releaseFence();
     }
 
     private MethodHandle lookupHandle(String name, Class<?> argType) {
@@ -464,11 +485,32 @@ public final class VarHandle {
         private final Object staticBase;
         private final boolean isStatic;
         private final Object lock = new Object();
+        private final long offset;
+        private final Class<?> type;
+        private final boolean useUnsafe;
+        private final boolean casSupported;
 
         FieldAccess(Field field, Object staticBase, boolean isStatic) {
             this.field = field;
-            this.staticBase = staticBase;
             this.isStatic = isStatic;
+            this.type = field.getType();
+            if (UNSAFE_ACCESS != null && UNSAFE_ACCESS.available) {
+                Object resolvedBase = staticBase;
+                if (isStatic) {
+                    this.offset = UNSAFE_ACCESS.unsafe.staticFieldOffset(field);
+                    resolvedBase = UNSAFE_ACCESS.unsafe.staticFieldBase(field);
+                } else {
+                    this.offset = UNSAFE_ACCESS.unsafe.objectFieldOffset(field);
+                }
+                this.staticBase = resolvedBase;
+                this.useUnsafe = UNSAFE_ACCESS.supportsType(type);
+                this.casSupported = UNSAFE_ACCESS.casSupported(type);
+            } else {
+                this.offset = -1;
+                this.useUnsafe = false;
+                this.casSupported = false;
+                this.staticBase = staticBase;
+            }
         }
 
         private Object receiver(Object[] args) {
@@ -494,9 +536,13 @@ public final class VarHandle {
 
         @Override
         public Object get(Object[] args) {
+            Object target = receiver(args);
+            if (useUnsafe) {
+                return UNSAFE_ACCESS.get(valueBase(target), offset, type);
+            }
             synchronized (lock) {
                 try {
-                    return field.get(receiver(args));
+                    return field.get(target);
                 } catch (IllegalAccessException e) {
                     throw new IllegalStateException(e);
                 }
@@ -509,9 +555,15 @@ public final class VarHandle {
             if (args.length <= index) {
                 throw new IllegalArgumentException("missing value");
             }
+            Object target = receiver(args);
+            Object value = args[index];
+            if (useUnsafe) {
+                UNSAFE_ACCESS.put(valueBase(target), offset, type, value);
+                return;
+            }
             synchronized (lock) {
                 try {
-                    field.set(receiver(args), args[index]);
+                    field.set(target, value);
                 } catch (IllegalAccessException e) {
                     throw new IllegalStateException(e);
                 }
@@ -524,10 +576,16 @@ public final class VarHandle {
             if (args.length <= index + 1) {
                 throw new IllegalArgumentException("missing compare arguments");
             }
+            Object target = receiver(args);
+            Object expected = args[index];
+            Object update = args[index + 1];
+            if (useUnsafe && casSupported) {
+                return UNSAFE_ACCESS.compareAndSet(valueBase(target), offset, type, expected, update);
+            }
             synchronized (lock) {
                 Object current = get(args);
-                if (equalsValue(current, args[index])) {
-                    set(setArgs(receiver(args), args[index + 1]));
+                if (equalsValue(current, expected)) {
+                    set(setArgs(target, update));
                     return true;
                 }
                 return false;
@@ -540,10 +598,23 @@ public final class VarHandle {
             if (args.length <= index + 1) {
                 throw new IllegalArgumentException("missing compare arguments");
             }
+            Object target = receiver(args);
+            Object expected = args[index];
+            Object update = args[index + 1];
+            if (useUnsafe && casSupported) {
+                Object current;
+                do {
+                    current = UNSAFE_ACCESS.get(valueBase(target), offset, type);
+                    if (!equalsValue(current, expected)) {
+                        return current;
+                    }
+                } while (!UNSAFE_ACCESS.compareAndSet(valueBase(target), offset, type, expected, update));
+                return current;
+            }
             synchronized (lock) {
                 Object current = get(args);
-                if (equalsValue(current, args[index])) {
-                    set(setArgs(receiver(args), args[index + 1]));
+                if (equalsValue(current, expected)) {
+                    set(setArgs(target, update));
                 }
                 return current;
             }
@@ -555,9 +626,18 @@ public final class VarHandle {
             if (args.length <= index) {
                 throw new IllegalArgumentException("missing value");
             }
+            Object target = receiver(args);
+            Object update = args[index];
+            if (useUnsafe && casSupported) {
+                Object current;
+                do {
+                    current = UNSAFE_ACCESS.get(valueBase(target), offset, type);
+                } while (!UNSAFE_ACCESS.compareAndSet(valueBase(target), offset, type, current, update));
+                return current;
+            }
             synchronized (lock) {
                 Object current = get(args);
-                set(setArgs(receiver(args), args[index]));
+                set(setArgs(target, update));
                 return current;
             }
         }
@@ -568,11 +648,21 @@ public final class VarHandle {
             if (args.length <= index) {
                 throw new IllegalArgumentException("missing value");
             }
+            Object target = receiver(args);
+            Number delta = toNumber(args[index]);
+            if (useUnsafe && casSupported) {
+                Object current;
+                Object next;
+                do {
+                    current = UNSAFE_ACCESS.get(valueBase(target), offset, type);
+                    next = addNumber(current, delta);
+                } while (!UNSAFE_ACCESS.compareAndSet(valueBase(target), offset, type, current, next));
+                return current;
+            }
             synchronized (lock) {
-                Number delta = toNumber(args[index]);
                 Object current = get(args);
                 Object next = addNumber(current, delta);
-                set(setArgs(receiver(args), next));
+                set(setArgs(target, next));
                 return current;
             }
         }
@@ -597,22 +687,53 @@ public final class VarHandle {
             if (args.length <= index) {
                 throw new IllegalArgumentException("missing value");
             }
-            synchronized (lock) {
-                Number delta = toNumber(args[index]);
-                Object current = get(args);
-                Object next = applyBitwise(current, delta, op);
-                set(setArgs(receiver(args), next));
+            Object target = receiver(args);
+            Number delta = toNumber(args[index]);
+            if (useUnsafe && casSupported) {
+                Object current;
+                Object next;
+                do {
+                    current = UNSAFE_ACCESS.get(valueBase(target), offset, type);
+                    next = applyBitwise(current, delta, op);
+                } while (!UNSAFE_ACCESS.compareAndSet(valueBase(target), offset, type, current, next));
                 return current;
             }
+            synchronized (lock) {
+                Object current = get(args);
+                Object next = applyBitwise(current, delta, op);
+                set(setArgs(target, next));
+                return current;
+            }
+        }
+
+        private Object valueBase(Object target) {
+            return isStatic ? (staticBase != null ? staticBase : target) : target;
         }
     }
 
     private static final class ArrayAccess implements Access {
         private final Class<?> arrayType;
         private final Object lock = new Object();
+        private final Class<?> componentType;
+        private final long baseOffset;
+        private final int indexScale;
+        private final boolean useUnsafe;
+        private final boolean casSupported;
 
         ArrayAccess(Class<?> arrayType) {
             this.arrayType = arrayType;
+            this.componentType = arrayType.getComponentType();
+            if (UNSAFE_ACCESS != null && UNSAFE_ACCESS.available) {
+                this.baseOffset = UNSAFE_ACCESS.unsafe.arrayBaseOffset(arrayType);
+                this.indexScale = UNSAFE_ACCESS.unsafe.arrayIndexScale(arrayType);
+                this.useUnsafe = UNSAFE_ACCESS.supportsType(componentType);
+                this.casSupported = UNSAFE_ACCESS.casSupported(componentType);
+            } else {
+                this.baseOffset = 0;
+                this.indexScale = 1;
+                this.useUnsafe = false;
+                this.casSupported = false;
+            }
         }
 
         private Object array(Object[] args) {
@@ -635,8 +756,14 @@ public final class VarHandle {
 
         @Override
         public Object get(Object[] args) {
+            Object target = array(args);
+            int idx = index(args);
+            if (useUnsafe) {
+                long offset = elementOffset(idx);
+                return UNSAFE_ACCESS.get(target, offset, componentType);
+            }
             synchronized (lock) {
-                return Array.get(array(args), index(args));
+                return Array.get(target, idx);
             }
         }
 
@@ -646,8 +773,16 @@ public final class VarHandle {
             if (args.length <= idx) {
                 throw new IllegalArgumentException("missing value");
             }
+            Object target = array(args);
+            int index = index(args);
+            Object value = args[idx];
+            if (useUnsafe) {
+                long offset = elementOffset(index);
+                UNSAFE_ACCESS.put(target, offset, componentType, value);
+                return;
+            }
             synchronized (lock) {
-                Array.set(array(args), index(args), args[idx]);
+                Array.set(target, index, value);
             }
         }
 
@@ -657,10 +792,17 @@ public final class VarHandle {
             if (args.length <= idx + 1) {
                 throw new IllegalArgumentException("missing compare args");
             }
+            Object target = array(args);
+            int index = index(args);
+            Object expected = args[idx];
+            Object update = args[idx + 1];
+            if (useUnsafe && casSupported) {
+                return UNSAFE_ACCESS.compareAndSet(target, elementOffset(index), componentType, expected, update);
+            }
             synchronized (lock) {
                 Object current = get(args);
-                if (equalsValue(current, args[idx])) {
-                    set(new Object[]{array(args), index(args), args[idx + 1]});
+                if (equalsValue(current, expected)) {
+                    set(new Object[]{target, index, update});
                     return true;
                 }
                 return false;
@@ -673,10 +815,24 @@ public final class VarHandle {
             if (args.length <= idx + 1) {
                 throw new IllegalArgumentException("missing compare args");
             }
+            Object target = array(args);
+            int index = index(args);
+            Object expected = args[idx];
+            Object update = args[idx + 1];
+            if (useUnsafe && casSupported) {
+                Object current;
+                do {
+                    current = UNSAFE_ACCESS.get(target, elementOffset(index), componentType);
+                    if (!equalsValue(current, expected)) {
+                        return current;
+                    }
+                } while (!UNSAFE_ACCESS.compareAndSet(target, elementOffset(index), componentType, expected, update));
+                return current;
+            }
             synchronized (lock) {
                 Object current = get(args);
-                if (equalsValue(current, args[idx])) {
-                    set(new Object[]{array(args), index(args), args[idx + 1]});
+                if (equalsValue(current, expected)) {
+                    set(new Object[]{target, index, update});
                 }
                 return current;
             }
@@ -688,9 +844,19 @@ public final class VarHandle {
             if (args.length <= idx) {
                 throw new IllegalArgumentException("missing value");
             }
+            Object target = array(args);
+            int index = index(args);
+            Object update = args[idx];
+            if (useUnsafe && casSupported) {
+                Object current;
+                do {
+                    current = UNSAFE_ACCESS.get(target, elementOffset(index), componentType);
+                } while (!UNSAFE_ACCESS.compareAndSet(target, elementOffset(index), componentType, current, update));
+                return current;
+            }
             synchronized (lock) {
                 Object current = get(args);
-                set(new Object[]{array(args), index(args), args[idx]});
+                set(new Object[]{target, index, update});
                 return current;
             }
         }
@@ -701,11 +867,22 @@ public final class VarHandle {
             if (args.length <= idx) {
                 throw new IllegalArgumentException("missing value");
             }
+            Object target = array(args);
+            int index = index(args);
+            Number delta = toNumber(args[idx]);
+            if (useUnsafe && casSupported) {
+                Object current;
+                Object next;
+                do {
+                    current = UNSAFE_ACCESS.get(target, elementOffset(index), componentType);
+                    next = addNumber(current, delta);
+                } while (!UNSAFE_ACCESS.compareAndSet(target, elementOffset(index), componentType, current, next));
+                return current;
+            }
             synchronized (lock) {
-                Number delta = toNumber(args[idx]);
                 Object current = get(args);
                 Object next = addNumber(current, delta);
-                set(new Object[]{array(args), index(args), next});
+                set(new Object[]{target, index, next});
                 return current;
             }
         }
@@ -730,12 +907,176 @@ public final class VarHandle {
             if (args.length <= idx) {
                 throw new IllegalArgumentException("missing value");
             }
+            Object target = array(args);
+            int index = index(args);
+            Number delta = toNumber(args[idx]);
+            if (useUnsafe && casSupported) {
+                Object current;
+                Object next;
+                do {
+                    current = UNSAFE_ACCESS.get(target, elementOffset(index), componentType);
+                    next = applyBitwise(current, delta, op);
+                } while (!UNSAFE_ACCESS.compareAndSet(target, elementOffset(index), componentType, current, next));
+                return current;
+            }
             synchronized (lock) {
-                Number delta = toNumber(args[idx]);
                 Object current = get(args);
                 Object next = applyBitwise(current, delta, op);
-                set(new Object[]{array(args), index(args), next});
+                set(new Object[]{target, index, next});
                 return current;
+            }
+        }
+
+        private long elementOffset(int index) {
+            return baseOffset + ((long) index) * indexScale;
+        }
+    }
+
+    private static final class UnsafeAccess {
+        final Unsafe unsafe;
+        final boolean available;
+        final java.lang.reflect.Method fullFence;
+        final java.lang.reflect.Method loadFence;
+        final java.lang.reflect.Method storeFence;
+
+        private UnsafeAccess(Unsafe unsafe,
+                             java.lang.reflect.Method fullFence,
+                             java.lang.reflect.Method loadFence,
+                             java.lang.reflect.Method storeFence) {
+            this.unsafe = unsafe;
+            this.available = unsafe != null;
+            this.fullFence = fullFence;
+            this.loadFence = loadFence;
+            this.storeFence = storeFence;
+        }
+
+        static UnsafeAccess create() {
+            try {
+                java.lang.reflect.Field field = Unsafe.class.getDeclaredField("theUnsafe");
+                field.setAccessible(true);
+                Unsafe unsafe = (Unsafe) field.get(null);
+                java.lang.reflect.Method fullFence = findMethod(unsafe, "fullFence");
+                java.lang.reflect.Method loadFence = findMethod(unsafe, "loadFence");
+                java.lang.reflect.Method storeFence = findMethod(unsafe, "storeFence");
+                return new UnsafeAccess(unsafe, fullFence, loadFence, storeFence);
+            } catch (Exception e) {
+                return null;
+            }
+        }
+
+        boolean supportsType(Class<?> type) {
+            if (type == null) {
+                return false;
+            }
+            if (!type.isPrimitive()) {
+                return true;
+            }
+            return type == int.class || type == long.class || type == float.class || type == double.class;
+        }
+
+        boolean casSupported(Class<?> type) {
+            return supportsType(type);
+        }
+
+        Object get(Object base, long offset, Class<?> type) {
+            if (!type.isPrimitive()) {
+                return unsafe.getObjectVolatile(base, offset);
+            }
+            if (type == int.class) {
+                return Integer.valueOf(unsafe.getIntVolatile(base, offset));
+            }
+            if (type == long.class) {
+                return Long.valueOf(unsafe.getLongVolatile(base, offset));
+            }
+            if (type == float.class) {
+                return Float.valueOf(Float.intBitsToFloat(unsafe.getIntVolatile(base, offset)));
+            }
+            if (type == double.class) {
+                return Double.valueOf(Double.longBitsToDouble(unsafe.getLongVolatile(base, offset)));
+            }
+            return unsafe.getObject(base, offset);
+        }
+
+        void put(Object base, long offset, Class<?> type, Object value) {
+            if (!type.isPrimitive()) {
+                unsafe.putObjectVolatile(base, offset, value);
+                return;
+            }
+            if (type == int.class) {
+                unsafe.putIntVolatile(base, offset, ((Number) value).intValue());
+                return;
+            }
+            if (type == long.class) {
+                unsafe.putLongVolatile(base, offset, ((Number) value).longValue());
+                return;
+            }
+            if (type == float.class) {
+                int bits = Float.floatToRawIntBits(((Number) value).floatValue());
+                unsafe.putIntVolatile(base, offset, bits);
+                return;
+            }
+            if (type == double.class) {
+                long bits = Double.doubleToRawLongBits(((Number) value).doubleValue());
+                unsafe.putLongVolatile(base, offset, bits);
+                return;
+            }
+            unsafe.putObjectVolatile(base, offset, value);
+        }
+
+        boolean compareAndSet(Object base, long offset, Class<?> type, Object expected, Object update) {
+            if (!type.isPrimitive()) {
+                return unsafe.compareAndSwapObject(base, offset, expected, update);
+            }
+            if (type == int.class) {
+                return unsafe.compareAndSwapInt(base, offset,
+                        ((Number) expected).intValue(),
+                        ((Number) update).intValue());
+            }
+            if (type == long.class) {
+                return unsafe.compareAndSwapLong(base, offset,
+                        ((Number) expected).longValue(),
+                        ((Number) update).longValue());
+            }
+            if (type == float.class) {
+                int expectedBits = Float.floatToRawIntBits(((Number) expected).floatValue());
+                int updateBits = Float.floatToRawIntBits(((Number) update).floatValue());
+                return unsafe.compareAndSwapInt(base, offset, expectedBits, updateBits);
+            }
+            if (type == double.class) {
+                long expectedBits = Double.doubleToRawLongBits(((Number) expected).doubleValue());
+                long updateBits = Double.doubleToRawLongBits(((Number) update).doubleValue());
+                return unsafe.compareAndSwapLong(base, offset, expectedBits, updateBits);
+            }
+            return unsafe.compareAndSwapObject(base, offset, expected, update);
+        }
+
+        void fullFence() {
+            invokeFence(fullFence);
+        }
+
+        void loadFence() {
+            invokeFence(loadFence);
+        }
+
+        void storeFence() {
+            invokeFence(storeFence);
+        }
+
+        private void invokeFence(java.lang.reflect.Method method) {
+            if (method == null) {
+                return;
+            }
+            try {
+                method.invoke(unsafe);
+            } catch (Exception ignored) {
+            }
+        }
+
+        private static java.lang.reflect.Method findMethod(Unsafe unsafe, String name) {
+            try {
+                return unsafe.getClass().getMethod(name);
+            } catch (Exception e) {
+                return null;
             }
         }
     }

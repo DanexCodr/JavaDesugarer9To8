@@ -21,8 +21,9 @@ import java.util.stream.Stream;
 /**
  * Java 8-compatible backport of {@link java.lang.StackWalker}.
  *
- * <p>This implementation relies on {@link Thread#getStackTrace()} and does not
- * expose JVM stack frames, hidden frames, or local variables.
+ * <p>This implementation relies on {@link Thread#getStackTrace()} and applies
+ * best-effort filtering for hidden/reflect frames while resolving bytecode
+ * indices from class debug metadata when available.
  */
 public final class StackWalker {
 
@@ -34,9 +35,13 @@ public final class StackWalker {
 
     private final boolean retainClassRef;
     private final int maxDepth;
+    private final boolean showReflectFrames;
+    private final boolean showHiddenFrames;
 
     private StackWalker(Set<Option> options, int maxDepth) {
         this.retainClassRef = options != null && options.contains(Option.RETAIN_CLASS_REFERENCE);
+        this.showReflectFrames = options != null && options.contains(Option.SHOW_REFLECT_FRAMES);
+        this.showHiddenFrames = options != null && options.contains(Option.SHOW_HIDDEN_FRAMES);
         this.maxDepth = maxDepth <= 0 ? Integer.MAX_VALUE : maxDepth;
     }
 
@@ -92,12 +97,31 @@ public final class StackWalker {
             if (className.equals(Thread.class.getName())) {
                 continue;
             }
+            if (!showReflectFrames && isReflectFrame(className)) {
+                continue;
+            }
+            if (!showHiddenFrames && isHiddenFrame(className)) {
+                continue;
+            }
             frames.add(new StackFrameImpl(element, retainClassRef));
             if (frames.size() >= maxDepth) {
                 break;
             }
         }
         return frames;
+    }
+
+    private boolean isReflectFrame(String className) {
+        return className.startsWith("java.lang.reflect.")
+                || className.startsWith("sun.reflect.")
+                || className.startsWith("jdk.internal.reflect.");
+    }
+
+    private boolean isHiddenFrame(String className) {
+        return className.startsWith("java.lang.invoke.")
+                || className.startsWith("sun.invoke.")
+                || className.startsWith("jdk.internal.invoke.")
+                || className.startsWith("java.util.concurrent.CompletableFuture$");
     }
 
     public interface StackFrame {
@@ -118,10 +142,12 @@ public final class StackWalker {
     private static final class StackFrameImpl implements StackFrame {
         private final StackTraceElement element;
         private final boolean retainClassRef;
+        private final int byteCodeIndex;
 
         StackFrameImpl(StackTraceElement element, boolean retainClassRef) {
             this.element = element;
             this.retainClassRef = retainClassRef;
+            this.byteCodeIndex = MethodDescriptorResolver.resolveByteCodeIndex(element);
         }
 
         @Override
@@ -161,7 +187,7 @@ public final class StackWalker {
 
         @Override
         public int getByteCodeIndex() {
-            return -1;
+            return byteCodeIndex;
         }
 
         @Override
@@ -233,6 +259,22 @@ public final class StackWalker {
                         + " (compile with -g for debug info, or method may be overloaded)");
             }
             return match.descriptor;
+        }
+
+        static int resolveByteCodeIndex(StackTraceElement element) {
+            int lineNumber = element.getLineNumber();
+            if (lineNumber < 0) {
+                return -1;
+            }
+            String className = element.getClassName();
+            String methodName = element.getMethodName();
+            ClassLoader loader = resolveClassLoader(className);
+            List<MethodInfo> methods = getMethods(className, loader);
+            MethodInfo match = findMethod(methods, methodName, lineNumber);
+            if (match == null) {
+                return -1;
+            }
+            return match.byteCodeIndex(lineNumber);
         }
 
         static ClassLoader resolveClassLoader(String className) {
@@ -367,6 +409,7 @@ public final class StackWalker {
             int attrs = in.readUnsignedShort();
             int minLine = -1;
             int maxLine = -1;
+            List<LineInfo> lines = new ArrayList<LineInfo>();
             for (int i = 0; i < attrs; i++) {
                 String attrName = utf8[in.readUnsignedShort()];
                 int len = in.readInt();
@@ -382,9 +425,9 @@ public final class StackWalker {
                         String codeAttrName = utf8[in.readUnsignedShort()];
                         int codeAttrLen = in.readInt();
                         if ("LineNumberTable".equals(codeAttrName)) {
-                            int lines = in.readUnsignedShort();
-                            for (int k = 0; k < lines; k++) {
-                                in.readUnsignedShort();
+                            int linesCount = in.readUnsignedShort();
+                            for (int k = 0; k < linesCount; k++) {
+                                int bci = in.readUnsignedShort();
                                 int line = in.readUnsignedShort();
                                 if (minLine == -1 || line < minLine) {
                                     minLine = line;
@@ -392,6 +435,7 @@ public final class StackWalker {
                                 if (line > maxLine) {
                                     maxLine = line;
                                 }
+                                lines.add(new LineInfo(line, bci));
                             }
                         } else {
                             skipFully(in, codeAttrLen);
@@ -401,7 +445,7 @@ public final class StackWalker {
                     skipFully(in, len);
                 }
             }
-            return new MethodInfo(name, descriptor, minLine, maxLine);
+            return new MethodInfo(name, descriptor, minLine, maxLine, lines);
         }
 
         private static void skipAttributes(DataInputStream in, int count) throws IOException {
@@ -450,7 +494,7 @@ public final class StackWalker {
                                                        ClassLoader loader,
                                                        String methodName) {
             if ("<clinit>".equals(methodName)) {
-                return new MethodInfo("<clinit>", "()V", -1, -1);
+                return new MethodInfo("<clinit>", "()V", -1, -1, Collections.<LineInfo>emptyList());
             }
             Class<?> clazz = tryLoad(className, loader);
             if (clazz == null) {
@@ -463,7 +507,7 @@ public final class StackWalker {
                 }
                 MethodInfo info = new MethodInfo(methodName,
                         methodDescriptor(method.getParameterTypes(), method.getReturnType()),
-                        -1, -1);
+                        -1, -1, Collections.<LineInfo>emptyList());
                 if (candidate != null) {
                     return null;
                 }
@@ -478,7 +522,7 @@ public final class StackWalker {
                     Constructor<?> ctor = constructors[0];
                     return new MethodInfo("<init>",
                             methodDescriptor(ctor.getParameterTypes(), void.class),
-                            -1, -1);
+                            -1, -1, Collections.<LineInfo>emptyList());
                 }
             }
             return null;
@@ -515,21 +559,53 @@ public final class StackWalker {
     }
 
     private static final class MethodInfo {
-        static final MethodInfo AMBIGUOUS_MATCH = new MethodInfo("", "", -1, -1);
+        static final MethodInfo AMBIGUOUS_MATCH =
+                new MethodInfo("", "", -1, -1, Collections.<LineInfo>emptyList());
         final String name;
         final String descriptor;
         final int minLine;
         final int maxLine;
+        final List<LineInfo> lines;
 
-        MethodInfo(String name, String descriptor, int minLine, int maxLine) {
+        MethodInfo(String name, String descriptor, int minLine, int maxLine, List<LineInfo> lines) {
             this.name = name;
             this.descriptor = descriptor;
             this.minLine = minLine;
             this.maxLine = maxLine;
+            this.lines = lines == null ? Collections.<LineInfo>emptyList()
+                    : Collections.unmodifiableList(new ArrayList<LineInfo>(lines));
         }
 
         boolean matchesLine(int line) {
             return minLine != -1 && line >= minLine && line <= maxLine;
+        }
+
+        int byteCodeIndex(int lineNumber) {
+            if (lineNumber < 0 || lines.isEmpty()) {
+                return -1;
+            }
+            int bestLine = -1;
+            int bestBci = -1;
+            for (LineInfo info : lines) {
+                if (info.line == lineNumber) {
+                    return info.bci;
+                }
+                if (info.line < lineNumber && info.line > bestLine) {
+                    bestLine = info.line;
+                    bestBci = info.bci;
+                }
+            }
+            return bestBci;
+        }
+    }
+
+    private static final class LineInfo {
+        final int line;
+        final int bci;
+
+        LineInfo(int line, int bci) {
+            this.line = line;
+            this.bci = bci;
         }
     }
 }

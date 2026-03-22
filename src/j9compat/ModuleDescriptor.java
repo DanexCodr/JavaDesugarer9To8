@@ -197,8 +197,26 @@ public final class ModuleDescriptor implements Comparable<ModuleDescriptor> {
         if (info == null) {
             return unnamed(packages);
         }
-        Builder builder = newModule(info.name);
+        Builder builder = new Builder(info.name, info.modifiers);
         builder.packages(packages);
+        if (info.version != null) {
+            builder.version(info.version);
+        }
+        for (Requires requires : info.requires) {
+            builder.requires(requires);
+        }
+        for (Exports exports : info.exports) {
+            builder.exports(exports);
+        }
+        for (Opens opens : info.opens) {
+            builder.opens(opens);
+        }
+        for (String use : info.uses) {
+            builder.uses(use);
+        }
+        for (Provides provides : info.provides) {
+            builder.provides(provides);
+        }
         return builder.build();
     }
 
@@ -776,61 +794,179 @@ public final class ModuleDescriptor implements Comparable<ModuleDescriptor> {
 
     private static final class ModuleInfo {
         final String name;
+        final Set<Modifier> modifiers;
+        final Version version;
+        final Set<Requires> requires;
+        final Set<Exports> exports;
+        final Set<Opens> opens;
+        final Set<String> uses;
+        final Set<Provides> provides;
 
-        ModuleInfo(String name) {
+        ModuleInfo(String name,
+                   Set<Modifier> modifiers,
+                   Version version,
+                   Set<Requires> requires,
+                   Set<Exports> exports,
+                   Set<Opens> opens,
+                   Set<String> uses,
+                   Set<Provides> provides) {
             this.name = name;
+            this.modifiers = modifiers;
+            this.version = version;
+            this.requires = requires;
+            this.exports = exports;
+            this.opens = opens;
+            this.uses = uses;
+            this.provides = provides;
         }
 
         static ModuleInfo read(DataInputStream data, ConstantPool pool) throws IOException {
             int moduleNameIndex = data.readUnsignedShort();
             String name = pool.moduleName(moduleNameIndex);
+            int moduleFlags = data.readUnsignedShort();
+            int moduleVersionIndex = data.readUnsignedShort();
+            Version moduleVersion = moduleVersionIndex == 0 ? null
+                    : Version.parse(pool.utf8(moduleVersionIndex));
+            Set<Modifier> modifiers = parseModuleModifiers(moduleFlags);
+
             int requiresCount = data.readUnsignedShort();
+            Set<Requires> requires = new HashSet<Requires>();
             for (int i = 0; i < requiresCount; i++) {
-                data.readUnsignedShort();
-                data.readUnsignedShort();
-                data.readUnsignedShort();
+                String reqName = pool.moduleName(data.readUnsignedShort());
+                int reqFlags = data.readUnsignedShort();
+                int reqVersionIndex = data.readUnsignedShort();
+                Version reqVersion = reqVersionIndex == 0 ? null
+                        : Version.parse(pool.utf8(reqVersionIndex));
+                requires.add(new Requires(parseRequiresModifiers(reqFlags), reqName, reqVersion));
             }
             int exportsCount = data.readUnsignedShort();
+            Set<Exports> exports = new HashSet<Exports>();
             for (int i = 0; i < exportsCount; i++) {
-                data.readUnsignedShort();
-                data.readUnsignedShort();
+                String source = toPackageName(pool.packageName(data.readUnsignedShort()));
+                int flags = data.readUnsignedShort();
                 int targetCount = data.readUnsignedShort();
+                Set<String> targets = new HashSet<String>();
                 for (int t = 0; t < targetCount; t++) {
-                    data.readUnsignedShort();
+                    String target = pool.moduleName(data.readUnsignedShort());
+                    if (target != null) {
+                        targets.add(target);
+                    }
                 }
+                exports.add(new Exports(parseExportsModifiers(flags), source, targets));
             }
             int opensCount = data.readUnsignedShort();
+            Set<Opens> opens = new HashSet<Opens>();
             for (int i = 0; i < opensCount; i++) {
-                data.readUnsignedShort();
-                data.readUnsignedShort();
+                String source = toPackageName(pool.packageName(data.readUnsignedShort()));
+                int flags = data.readUnsignedShort();
                 int targetCount = data.readUnsignedShort();
+                Set<String> targets = new HashSet<String>();
                 for (int t = 0; t < targetCount; t++) {
-                    data.readUnsignedShort();
+                    String target = pool.moduleName(data.readUnsignedShort());
+                    if (target != null) {
+                        targets.add(target);
+                    }
                 }
+                opens.add(new Opens(parseOpensModifiers(flags), source, targets));
             }
             int usesCount = data.readUnsignedShort();
+            Set<String> uses = new HashSet<String>();
             for (int i = 0; i < usesCount; i++) {
-                data.readUnsignedShort();
-            }
-            int providesCount = data.readUnsignedShort();
-            for (int i = 0; i < providesCount; i++) {
-                data.readUnsignedShort();
-                int implCount = data.readUnsignedShort();
-                for (int t = 0; t < implCount; t++) {
-                    data.readUnsignedShort();
+                String use = toClassName(pool.className(data.readUnsignedShort()));
+                if (use != null) {
+                    uses.add(use);
                 }
             }
-            return new ModuleInfo(name);
+            int providesCount = data.readUnsignedShort();
+            Set<Provides> provides = new HashSet<Provides>();
+            for (int i = 0; i < providesCount; i++) {
+                String service = toClassName(pool.className(data.readUnsignedShort()));
+                int implCount = data.readUnsignedShort();
+                List<String> impls = new ArrayList<String>(implCount);
+                for (int t = 0; t < implCount; t++) {
+                    String impl = toClassName(pool.className(data.readUnsignedShort()));
+                    if (impl != null) {
+                        impls.add(impl);
+                    }
+                }
+                provides.add(new Provides(service, impls));
+            }
+            return new ModuleInfo(name, modifiers, moduleVersion, requires, exports, opens, uses, provides);
+        }
+
+        private static Set<Modifier> parseModuleModifiers(int flags) {
+            Set<Modifier> mods = EnumSet.noneOf(Modifier.class);
+            if ((flags & 0x0020) != 0) {
+                mods.add(Modifier.OPEN);
+            }
+            if ((flags & 0x1000) != 0) {
+                mods.add(Modifier.SYNTHETIC);
+            }
+            if ((flags & 0x8000) != 0) {
+                mods.add(Modifier.MANDATED);
+            }
+            return mods;
+        }
+
+        private static Set<Requires.Modifier> parseRequiresModifiers(int flags) {
+            Set<Requires.Modifier> mods = EnumSet.noneOf(Requires.Modifier.class);
+            if ((flags & 0x0020) != 0) {
+                mods.add(Requires.Modifier.TRANSITIVE);
+            }
+            if ((flags & 0x0040) != 0) {
+                mods.add(Requires.Modifier.STATIC);
+            }
+            if ((flags & 0x1000) != 0) {
+                mods.add(Requires.Modifier.SYNTHETIC);
+            }
+            if ((flags & 0x8000) != 0) {
+                mods.add(Requires.Modifier.MANDATED);
+            }
+            return mods;
+        }
+
+        private static Set<Exports.Modifier> parseExportsModifiers(int flags) {
+            Set<Exports.Modifier> mods = EnumSet.noneOf(Exports.Modifier.class);
+            if ((flags & 0x1000) != 0) {
+                mods.add(Exports.Modifier.SYNTHETIC);
+            }
+            if ((flags & 0x8000) != 0) {
+                mods.add(Exports.Modifier.MANDATED);
+            }
+            return mods;
+        }
+
+        private static Set<Opens.Modifier> parseOpensModifiers(int flags) {
+            Set<Opens.Modifier> mods = EnumSet.noneOf(Opens.Modifier.class);
+            if ((flags & 0x1000) != 0) {
+                mods.add(Opens.Modifier.SYNTHETIC);
+            }
+            if ((flags & 0x8000) != 0) {
+                mods.add(Opens.Modifier.MANDATED);
+            }
+            return mods;
+        }
+
+        private static String toPackageName(String internal) {
+            return internal == null ? null : internal.replace('/', '.');
+        }
+
+        private static String toClassName(String internal) {
+            return internal == null ? null : internal.replace('/', '.');
         }
     }
 
     private static final class ConstantPool {
         private final String[] utf8;
         private final int[] moduleNames;
+        private final int[] classNames;
+        private final int[] packageNames;
 
-        private ConstantPool(String[] utf8, int[] moduleNames) {
+        private ConstantPool(String[] utf8, int[] moduleNames, int[] classNames, int[] packageNames) {
             this.utf8 = utf8;
             this.moduleNames = moduleNames;
+            this.classNames = classNames;
+            this.packageNames = packageNames;
         }
 
         String utf8(int index) {
@@ -848,10 +984,28 @@ public final class ModuleDescriptor implements Comparable<ModuleDescriptor> {
             return utf8(utfIndex);
         }
 
+        String className(int index) {
+            if (index <= 0 || index >= classNames.length) {
+                return null;
+            }
+            int utfIndex = classNames[index];
+            return utf8(utfIndex);
+        }
+
+        String packageName(int index) {
+            if (index <= 0 || index >= packageNames.length) {
+                return null;
+            }
+            int utfIndex = packageNames[index];
+            return utf8(utfIndex);
+        }
+
         static ConstantPool read(DataInputStream data) throws IOException {
             int count = data.readUnsignedShort();
             String[] utf8 = new String[count];
             int[] moduleNames = new int[count];
+            int[] classNames = new int[count];
+            int[] packageNames = new int[count];
             for (int i = 1; i < count; i++) {
                 int tag = data.readUnsignedByte();
                 switch (tag) {
@@ -868,6 +1022,8 @@ public final class ModuleDescriptor implements Comparable<ModuleDescriptor> {
                         i++;
                         break;
                     case 7:
+                        classNames[i] = data.readUnsignedShort();
+                        break;
                     case 8:
                     case 16:
                         data.readUnsignedShort();
@@ -888,13 +1044,13 @@ public final class ModuleDescriptor implements Comparable<ModuleDescriptor> {
                         moduleNames[i] = data.readUnsignedShort();
                         break;
                     case 20:
-                        data.readUnsignedShort();
+                        packageNames[i] = data.readUnsignedShort();
                         break;
                     default:
                         throw new IOException("Unknown constant pool tag " + tag);
                 }
             }
-            return new ConstantPool(utf8, moduleNames);
+            return new ConstantPool(utf8, moduleNames, classNames, packageNames);
         }
     }
 

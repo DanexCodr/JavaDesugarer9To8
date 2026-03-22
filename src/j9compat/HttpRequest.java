@@ -1,9 +1,13 @@
 package j9compat;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -12,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * Minimal Java 8-compatible backport of {@code java.net.http.HttpRequest}.
@@ -140,6 +145,31 @@ public class HttpRequest {
             System.arraycopy(bytes, offset, copy, 0, length);
             return new ByteArrayBodyPublisher(copy);
         }
+
+        public static BodyPublisher ofInputStream(Supplier<? extends InputStream> supplier) {
+            if (supplier == null) {
+                throw new NullPointerException("supplier");
+            }
+            return new InputStreamBodyPublisher(supplier);
+        }
+
+        public static BodyPublisher ofFile(Path path) {
+            if (path == null) {
+                throw new NullPointerException("path");
+            }
+            return new FileBodyPublisher(path);
+        }
+
+        public static BodyPublisher fromPublisher(Flow.Publisher<ByteBuffer> publisher) {
+            return fromPublisher(publisher, -1);
+        }
+
+        public static BodyPublisher fromPublisher(Flow.Publisher<ByteBuffer> publisher, long contentLength) {
+            if (publisher == null) {
+                throw new NullPointerException("publisher");
+            }
+            return new PublisherBodyPublisher(publisher, contentLength);
+        }
     }
 
     static final class ByteArrayBodyPublisher implements BodyPublisher {
@@ -168,6 +198,93 @@ public class HttpRequest {
                 subscriber.onNext(ByteBuffer.wrap(bytes));
             }
             subscriber.onComplete();
+        }
+    }
+
+    static final class InputStreamBodyPublisher implements BodyPublisher {
+        private final Supplier<? extends InputStream> supplier;
+
+        InputStreamBodyPublisher(Supplier<? extends InputStream> supplier) {
+            this.supplier = supplier;
+        }
+
+        Supplier<? extends InputStream> supplier() {
+            return supplier;
+        }
+
+        @Override
+        public long contentLength() {
+            return -1;
+        }
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
+            if (subscriber == null) {
+                throw new NullPointerException("subscriber");
+            }
+            subscriber.onSubscribe(new StreamSubscription(subscriber, supplier));
+        }
+    }
+
+    static final class FileBodyPublisher implements BodyPublisher {
+        private final Path path;
+
+        FileBodyPublisher(Path path) {
+            this.path = path;
+        }
+
+        Path path() {
+            return path;
+        }
+
+        @Override
+        public long contentLength() {
+            try {
+                return Files.size(path);
+            } catch (IOException e) {
+                return -1;
+            }
+        }
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
+            if (subscriber == null) {
+                throw new NullPointerException("subscriber");
+            }
+            subscriber.onSubscribe(new StreamSubscription(subscriber, new Supplier<InputStream>() {
+                @Override
+                public InputStream get() {
+                    try {
+                        return Files.newInputStream(path);
+                    } catch (IOException e) {
+                        throw new IllegalStateException(e);
+                    }
+                }
+            }));
+        }
+    }
+
+    static final class PublisherBodyPublisher implements BodyPublisher {
+        private final Flow.Publisher<ByteBuffer> publisher;
+        private final long contentLength;
+
+        PublisherBodyPublisher(Flow.Publisher<ByteBuffer> publisher, long contentLength) {
+            this.publisher = publisher;
+            this.contentLength = contentLength;
+        }
+
+        Flow.Publisher<ByteBuffer> publisher() {
+            return publisher;
+        }
+
+        @Override
+        public long contentLength() {
+            return contentLength;
+        }
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
+            publisher.subscribe(subscriber);
         }
     }
 
@@ -313,6 +430,60 @@ public class HttpRequest {
         @Override
         public void cancel() {
             // no-op
+        }
+    }
+
+    private static final class StreamSubscription implements Flow.Subscription {
+        private final Flow.Subscriber<? super ByteBuffer> subscriber;
+        private final Supplier<? extends InputStream> supplier;
+        private volatile boolean cancelled;
+        private volatile boolean started;
+
+        StreamSubscription(Flow.Subscriber<? super ByteBuffer> subscriber,
+                           Supplier<? extends InputStream> supplier) {
+            this.subscriber = subscriber;
+            this.supplier = supplier;
+        }
+
+        @Override
+        public void request(long n) {
+            if (n <= 0 || cancelled || started) {
+                return;
+            }
+            started = true;
+            InputStream input;
+            try {
+                input = supplier.get();
+            } catch (RuntimeException e) {
+                subscriber.onError(e);
+                return;
+            }
+            if (input == null) {
+                subscriber.onComplete();
+                return;
+            }
+            try (InputStream in = input) {
+                byte[] buffer = new byte[8192];
+                int read;
+                while (!cancelled && (read = in.read(buffer)) >= 0) {
+                    if (read == 0) {
+                        continue;
+                    }
+                    subscriber.onNext(ByteBuffer.wrap(buffer, 0, read));
+                }
+                if (!cancelled) {
+                    subscriber.onComplete();
+                }
+            } catch (IOException e) {
+                if (!cancelled) {
+                    subscriber.onError(e);
+                }
+            }
+        }
+
+        @Override
+        public void cancel() {
+            cancelled = true;
         }
     }
 }

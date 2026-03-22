@@ -110,8 +110,8 @@ public final class StackWalkerBackportTest {
                 "StackFrame.getClassName: matches test class");
         assertEquals(StackWalkerBackportTest.class, frame.getDeclaringClass(),
                 "StackFrame.getDeclaringClass: resolves with RETAIN_CLASS_REFERENCE");
-        assertEquals(-1, frame.getByteCodeIndex(),
-                "StackFrame.getByteCodeIndex: not retained");
+        assertTrue(frame.getByteCodeIndex() >= 0,
+                "StackFrame.getByteCodeIndex: resolved");
         assertTrue(frame.getFileName() != null, "StackFrame.getFileName: available");
         assertTrue(frame.getLineNumber() > 0, "StackFrame.getLineNumber: positive");
         assertTrue(!frame.isNativeMethod(), "StackFrame.isNativeMethod: false for Java frame");
